@@ -1,8 +1,5 @@
-use crate::util::*;
-use std::{
-    io::{self, Read, Write},
-    str::from_utf8,
-};
+use crate::{prelude::*, secure_vec::*};
+use std::io::{Read, Write};
 
 /// This trait helps make the encoding logic more functional.
 ///
@@ -12,18 +9,18 @@ use std::{
 /// function compopsition.
 ///
 /// For example encrypting the compressed content of a file may look something like
-/// `EncryptorAES::wrap(Compressor::wrap(some_file))`.
+/// `Aes256CbcEnc::wrap(Compressor::wrap(some_file))`.
 pub trait CryptEncoder<R>: Read
 where
     R: Read,
 {
     /// read all content to `target`
-    fn read_all_to<W>(&mut self, target: &mut W) -> io::Result<usize>
+    fn read_all_to<W>(&mut self, target: &mut W) -> CsyncResult<SecureVec<usize>>
     where
         W: Write,
     {
         // temp buffer to hold data
-        let mut buffer = [0u8; BUFFER_SIZE];
+        let mut buffer = [0u8; DEFAULT_BUFFER_SIZE];
         let mut count = 0;
 
         Ok(loop {
@@ -32,7 +29,7 @@ where
                 0 => {
                     // means we are done reading
                     target.flush()?;
-                    break count;
+                    break vec![count].into();
                 }
                 bytes_read => {
                     let data = &buffer[0..bytes_read];
@@ -43,17 +40,23 @@ where
         })
     }
 
+    ///
+    fn get_inner(self) -> Option<R>;
+
+    ///
+    fn get_inner_ref(&self) -> Option<&R>;
+
     /// return the content as a vector
-    fn as_vec(&mut self) -> io::Result<Vec<u8>> {
+    fn as_vec(&mut self) -> CsyncResult<Vec<u8>> {
         let mut result = Vec::new();
         self.read_all_to(&mut result)?;
         Ok(result)
     }
 
     /// return the content as a string
-    fn as_string(&mut self) -> io::Result<String> {
+    fn as_string(&mut self) -> CsyncResult<String> {
         let as_vec = self.as_vec()?;
-        from_utf8(&as_vec).map(String::from).map_err(io_err)
+        std::str::from_utf8(&as_vec).map(String::from).map_err(CsyncErr::from)
     }
 }
 
@@ -67,31 +70,14 @@ where
 ///
 /// # Examples
 ///
-/// ```
-/// #[macro_use]
-/// extern crate cryptor;
-///
-/// let data: Vec<u8> = (0..64).collect();                  // data to encode
-/// let key_hash: &[u8] = hash("some password".as_bytes()); // hash of the passphrase
-/// let init_vec: &[u8] = &[0; 16]                          // initialization vector for the encryption
-///
-/// // nested encoder which encrypts data, then encodes it using base64
-/// let ciphertext = compose_encoders!(
-///     data,
-///     EncryptorAES => (&key_hash, Some(&init_vec)),
-///     TextEncoder => &data_encoding::BASE64
-/// )
-/// .unwrap()
-/// .as_string()
-/// .unwrap();
-/// ```
+/// TODO
 macro_rules! compose_encoders {
     ( $root:expr, $( $crypt_encoder:ident => $meta:expr ),* ) => {{
-        let cryptor = Ok($root);
+        let cryptor: crate::prelude::CsyncResult<_> = Ok($root);
         $(
-            let cryptor = match cryptor {
+            let cryptor: crate::prelude::CsyncResult<_> = match cryptor {
                 Ok(c) => $crypt_encoder::new(c, $meta),
-                Err(err) => Err(err),
+                Err(err) => Err(err) // implicit conversion
             };
         )*
         cryptor
@@ -105,6 +91,7 @@ mod tests {
     use std::fs::File;
     use std::path::Path;
 
+    ///
     fn first_bytes(filepath: &Path, num_bytes: usize) -> Vec<u8> {
         File::open(filepath)
             .unwrap()
@@ -114,6 +101,7 @@ mod tests {
             .collect()
     }
 
+    ///
     #[test]
     fn dropped_read_all_to_overwrites() {
         let dir = tmpdir!().unwrap();
@@ -136,6 +124,7 @@ mod tests {
         assert!(&first_bytes(&filepath, 4)[..] != b"abcd");
     }
 
+    ///
     #[test]
     fn no_drop_read_all_to_does_not_overwrite() {
         let dir = tmpdir!().unwrap();

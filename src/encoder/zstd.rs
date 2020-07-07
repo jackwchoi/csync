@@ -1,15 +1,11 @@
 pub use crate::encoder::crypt_encoder::*;
 
-use crate::util::*;
+use crate::prelude::*;
 use std::io::{self, BufReader, Read};
-use zstd::stream::read::Decoder;
-use zstd::stream::read::Encoder;
-
-const DEFAULT_ZSTD_LEVEL: u8 = 3;
-
-const_assert!(DEFAULT_ZSTD_LEVEL <= 22);
+use zstd::stream::read::{Decoder, Encoder};
 
 // encoder does all the work so bare bones
+///
 pub struct ZstdEncoder<R>
 where
     R: Read,
@@ -18,11 +14,13 @@ where
 }
 
 //
+///
 impl<R> ZstdEncoder<R>
 where
     R: Read,
 {
-    pub fn new(source: R, opt_level: Option<u8>) -> io::Result<Self> {
+    ///
+    pub fn new(source: R, opt_level: Option<u8>) -> CsyncResult<Self> {
         let level: u8 = opt_level.unwrap_or(DEFAULT_ZSTD_LEVEL);
         assert!(level <= 22);
 
@@ -33,19 +31,38 @@ where
 }
 
 // just read from zstd encoder
+///
 impl<R> Read for ZstdEncoder<R>
 where
     R: Read,
 {
+    ///
     fn read(&mut self, target: &mut [u8]) -> io::Result<usize> {
         self.encoder.read(target)
     }
 }
 
-impl<R> CryptEncoder<R> for ZstdEncoder<R> where R: Read {}
+///
+impl<R> CryptEncoder<R> for ZstdEncoder<R>
+where
+    R: Read,
+{
+    ///
+    #[inline]
+    fn get_inner(self) -> Option<R> {
+        None
+    }
+
+    ///
+    #[inline]
+    fn get_inner_ref(&self) -> Option<&R> {
+        Some(self.encoder.get_ref().get_ref())
+    }
+}
 
 //////////////////////////////////////////////////////
 
+///
 pub struct ZstdDecoder<R>
 where
     R: Read,
@@ -53,27 +70,47 @@ where
     decoder: Decoder<BufReader<R>>,
 }
 
+///
 impl<R> ZstdDecoder<R>
 where
     R: Read,
 {
-    pub fn new(source: R, _unused: Option<u8>) -> io::Result<Self> {
+    ///
+    pub fn new(source: R, _unused: Option<u8>) -> CsyncResult<Self> {
         Ok(Self {
             decoder: Decoder::new(source)?,
         })
     }
 }
 
+///
 impl<R> Read for ZstdDecoder<R>
 where
     R: Read,
 {
+    ///
     fn read(&mut self, target: &mut [u8]) -> io::Result<usize> {
         self.decoder.read(target)
     }
 }
 
-impl<R> CryptEncoder<R> for ZstdDecoder<R> where R: Read {}
+///
+impl<R> CryptEncoder<R> for ZstdDecoder<R>
+where
+    R: Read,
+{
+    ///
+    #[inline]
+    fn get_inner(self) -> Option<R> {
+        None
+    }
+
+    ///
+    #[inline]
+    fn get_inner_ref(&self) -> Option<&R> {
+        Some(self.decoder.get_ref().get_ref())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -81,14 +118,17 @@ mod tests {
     use crate::{encoder::zstd::*, test_util::*, util::*};
     use rayon::{iter::ParallelBridge, prelude::*};
 
+    ///
     fn gen(num_bits: u8) -> Vec<u8> {
         drng_range(1 << num_bits, 32, 126)
     }
 
+    ///
     fn test_data() -> Vec<Vec<u8>> {
         vec![gen(12), gen(13), gen(14), gen(15)]
     }
 
+    ///
     #[test]
     fn parametrized() {
         test_data().into_par_iter().for_each(|input_bytes| {
@@ -101,6 +141,7 @@ mod tests {
     }
 
     // make sure that f x = Decoder Encoder x = x
+    ///
     #[test]
     fn parametrized_inverse() {
         (10..15)

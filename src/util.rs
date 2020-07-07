@@ -1,51 +1,194 @@
-/// THIS MOD SHOULD NOT USE THINGS FROM OTHER MODS IN THIS CRATE.
+use crate::{prelude::*, secure_vec::*};
 use std::{
-    fmt::Debug,
-    io::{self, Error, Read},
+    convert::Into,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
-pub const BUFFER_SIZE: usize = 1 << 16;
-
-const_assert!(BUFFER_SIZE == 65536);
-
-// TODO use a custom error struct instead of std::io::Error
-macro_rules! err {
-    ( $message:expr ) => {
-        std::io::Error::new(std::io::ErrorKind::Other, $message)
+///
+pub fn adjust_value(value: f64, base_unit: &str) -> (String, String) {
+    let (adjusted, unit) = match value {
+        v if value < 1e03 => (v, format!(" {}", base_unit)),
+        v if value < 1e06 => (v / 1e03, format!("K{}", base_unit)),
+        v if value < 1e09 => (v / 1e06, format!("M{}", base_unit)),
+        v if value < 1e12 => (v / 1e09, format!("G{}", base_unit)),
+        v if value < 1e15 => (v / 1e12, format!("T{}", base_unit)),
+        v if value < 1e18 => (v / 1e15, format!("P{}", base_unit)),
+        v => (v, format!("many {}", base_unit)),
     };
-    ( $message:expr, $($arg:expr),* ) => {
-        std::io::Error::new(std::io::ErrorKind::Other, format!($message, $($arg),*))
-    };
+    let adjusted_value = format!("{:.3}", adjusted);
+    (adjusted_value, unit)
 }
 
-/// `None` if
-pub fn subpath(path: &Path, root: &Path) -> Option<PathBuf> {
-    let root_comps_len = root.components().count();
-    match path.starts_with(root) {
-        true => Some(path.components().skip(root_comps_len).collect()),
+/// # Returns
+///
+/// The content of `defaultable_opt` if it exists.
+///
+/// Returns the default value if not present.
+#[inline]
+pub fn unwrap_or_default<D>(defaultable_opt: Option<D>) -> D
+where
+    D: Default,
+{
+    defaultable_opt.unwrap_or(Default::default())
+}
+
+///
+#[inline]
+pub fn serialize<'a, T>(strct: &'a T) -> CsyncResult<impl serde::Deserialize<'a> + Into<SecureBytes> + AsRef<[u8]>>
+where
+    T: std::fmt::Debug + serde::Serialize,
+{
+    match bincode::serialize(strct) {
+        Ok(ser) => Ok(ser),
+        Err(_) => csync_err!(SerdeFailed),
+    }
+}
+
+///
+#[inline]
+pub fn deserialize<'a, T>(bytes: &'a [u8]) -> CsyncResult<T>
+where
+    T: std::fmt::Debug + serde::Deserialize<'a>,
+{
+    match bincode::deserialize(bytes) {
+        Ok(de) => Ok(de),
+        Err(_) => csync_err!(SerdeFailed),
+    }
+}
+
+/// Read bytes from `r` and write them to `buf`, up to but not including the first occurrence
+/// `delim` in the sequence.
+///
+/// For example if `r` contains the bytes `[10, 20, 30, 10, 20, 30]`, and `delim == 30`, the
+/// first 3 bytes will be consumed from `r` and `[10, 20]` will be written to `buf`.
+///
+/// # Parameters
+///
+/// 1. `r`:
+/// 1. `delim`:
+/// 1. `buf`:
+///
+/// # Returns
+///
+/// Number of bytes read from `r`.
+///
+/// Taken from https://doc.rust-lang.org/src/std/io/mod.rs.html#1701 and adjusted.
+pub fn read_until<BR, W>(r: &mut BR, delim: u8, buf: &mut W) -> std::io::Result<usize>
+where
+    BR: std::io::BufRead,
+    W: std::io::Write,
+{
+    let mut read = 0;
+    loop {
+        let (done, used) = {
+            // number of bytes the call to `fill_buf` grabbed
+            let available = match r.fill_buf() {
+                Ok(bytes) => bytes,
+                Err(ref err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(err) => break Err(err),
+            };
+            // search for `delim` within `available`
+            match memchr::memchr(delim, available) {
+                // `available[i] == delim`
+                Some(i) => {
+                    buf.write_all(&available[..i])?;
+                    (true, i + 1)
+                }
+                None => {
+                    buf.write_all(&available[..])?;
+                    (false, available.len())
+                }
+            }
+        };
+
+        r.consume(used);
+        read += used;
+        if done || used == 0 {
+            break Ok(read);
+        }
+    }
+}
+
+/// # Returns
+///
+/// If `path = root.join(rel_path)` then `Some(rel_path)`, `None` otherwise.
+pub fn subpath<P1, P2>(path: P1, root: P2) -> Option<PathBuf>
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    let root_comps_len = root.as_ref().components().count();
+    let without_root = match path.as_ref().starts_with(&root) {
+        true => Some(path.as_ref().components().skip(root_comps_len).collect()),
         false => None,
-    }
+    };
+
+    // sanity check
+    debug_assert!(match &without_root {
+        Some(sub_p) => &root.as_ref().join(sub_p) == path.as_ref(),
+        None => true,
+    });
+
+    without_root
 }
 
-pub fn subpath_par(path: &Path, root: &Path) -> Option<PathBuf> {
-    match root.parent() {
-        Some(root_par) => subpath(path, root_par),
-        None => subpath(path, root),
-    }
+/// # Returns
+///
+/// If `path = root.join(rel_path)` then `Some( basename(root).join(rel_path) )`, `None` otherwise.
+pub fn subpath_par<P1, P2>(path: P1, root: P2) -> Option<PathBuf>
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    subpath(path, &root).map(|rel_path| {
+        let root_basename = Path::new(root.as_ref().file_name().unwrap());
+        root_basename.join(rel_path)
+    })
 }
 
 /// Conversion from `&Path` to `String` in one shot.
 #[inline]
-pub fn path_as_str(path: &Path) -> Option<String> {
-    path.as_os_str().to_str().map(String::from)
+pub fn path_as_string<P>(path: P) -> Option<String>
+where
+    P: AsRef<Path>,
+{
+    path.as_ref().as_os_str().to_str().map(String::from)
 }
 
+///
 #[inline]
-pub fn is_canonical(path: &Path) -> io::Result<bool> {
-    Ok(&path.canonicalize()? == path)
+pub fn start_timer() -> Instant {
+    Instant::now()
 }
 
+///
+#[inline]
+pub fn end_timer(time: &Instant) -> Duration {
+    time.elapsed()
+}
+
+///
+macro_rules! time {
+    ( $code:expr ) => {
+        time!(false, "", $code)
+    };
+    ( $verbose:expr, $message:expr, $code:expr ) => {{
+        if $verbose {
+            eprint!("\n{}...", $message)
+        };
+        let start = crate::util::start_timer();
+        let result = { $code };
+        let elapsed = crate::util::end_timer(&start);
+
+        if $verbose {
+            eprintln!(" took {:?}", elapsed);
+        }
+        (result, elapsed)
+    }};
+}
+
+///
 #[inline]
 pub fn u8s_to_u32(bytes: &[u8]) -> u32 {
     debug_assert_eq!(bytes.len(), 4);
@@ -61,6 +204,7 @@ pub fn u8s_to_u32(bytes: &[u8]) -> u32 {
         .sum()
 }
 
+///
 #[inline]
 pub fn u32_to_u8s(reg: u32) -> Vec<u8> {
     [0xFFu32, 0xFF00u32, 0xFF0000u32, 0xFF000000u32]
@@ -72,14 +216,6 @@ pub fn u32_to_u8s(reg: u32) -> Vec<u8> {
         })
         .rev()
         .collect()
-}
-
-#[inline]
-pub fn io_err<D>(error: D) -> Error
-where
-    D: Debug,
-{
-    err!("{:?}", error)
 }
 
 /// check if the two iterators are equivalent
@@ -102,10 +238,11 @@ where
     }
 }
 
-/// read exactly count number of bytes from src
-pub fn read_exact<R>(count: usize, src: &mut R) -> io::Result<Vec<u8>>
+/// read exactly `count` number of bytes from src
+/// TODO optimize using tricks in read_until?
+pub fn read_exact<R>(count: usize, src: &mut R) -> CsyncResult<Vec<u8>>
 where
-    R: Read,
+    R: std::io::Read,
 {
     let mut reservoir: Vec<u8> = Vec::with_capacity(count);
     let mut buffer = vec![0u8; count];
@@ -114,7 +251,7 @@ where
         match count - reservoir.len() {
             0 => break Ok(reservoir),
             bytes_left => match src.read(&mut buffer[..bytes_left])? {
-                0 => break Err(err!("there was less than {} bytes", count)),
+                0 => break csync_err!(Other, format!("there was less than {:?} bytes", count)),
                 bytes_read => (&buffer[..bytes_read]).iter().for_each(|byte| reservoir.push(*byte)),
             },
         }
@@ -132,10 +269,12 @@ mod tests {
     use std::u8;
     use walkdir::DirEntry;
 
+    ///
     mod read_exact {
         use super::*;
         use std::io::Write;
 
+        ///
         #[test]
         fn parametrized() {
             let out_dir = tmpdir!().unwrap();
@@ -156,10 +295,12 @@ mod tests {
         }
     }
 
+    ///
     mod subpath {
         use super::*;
 
         // path, root, expected
+        ///
         fn test_data_no_panic<'a>() -> Vec<(&'a str, &'a str, &'a str)> {
             vec![
                 // NOT root, empties
@@ -185,6 +326,7 @@ mod tests {
             ]
         }
 
+        ///
         // path, root, expected
         fn test_data_panic<'a>() -> Vec<(&'a str, &'a str, &'a str)> {
             vec![
@@ -207,6 +349,7 @@ mod tests {
             ]
         }
 
+        ///
         fn result_expected<'a>(tuple: (&'a str, &'a str, &'a str)) -> (Option<PathBuf>, PathBuf) {
             let (path_str, root_str, expected_str) = tuple;
             let path = Path::new(path_str);
@@ -217,6 +360,7 @@ mod tests {
             (result, expected)
         }
 
+        ///
         #[test]
         fn parametrized_success() {
             test_data_no_panic()
@@ -227,6 +371,7 @@ mod tests {
                 });
         }
 
+        ///
         #[test]
         fn parametrized_fail() {
             test_data_panic()
@@ -238,6 +383,7 @@ mod tests {
         }
     }
 
+    ///
     #[test]
     fn iter_eq_str() {
         let data = vec![
@@ -257,9 +403,10 @@ mod tests {
         });
     }
 
+    ///
     #[test]
     fn u8_u32_conversion_inverse() {
-        drng_range(4 * 128, u8::MIN, u8::MAX)
+        drng_range(4 * 128, std::u8::MIN, std::u8::MAX)
             .into_iter()
             .chunks(4)
             .into_iter()

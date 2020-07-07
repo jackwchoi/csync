@@ -1,19 +1,14 @@
 pub use crate::encoder::crypt_encoder::*;
 
-use crate::util::*;
+use crate::prelude::*;
 use data_encoding::Encoding;
-use data_encoding_macro::*;
 use std::{
     cmp::min,
     collections::VecDeque,
     io::{self, BufReader, Read},
 };
 
-pub const BASE32PATH: Encoding = new_encoding! {
-    symbols: "abcdefghijklmnopqrstuvwxyz012345",
-    padding: '_',
-};
-
+///
 fn size_block(encoding: &Encoding) -> usize {
     // check that the encoding has 2^n number of symbols for some n
     let symbol_count = encoding.specification().symbols.len() as f64;
@@ -23,8 +18,9 @@ fn size_block(encoding: &Encoding) -> usize {
     (symbol_count_log2 as usize) * 8
 }
 
+///
 #[inline]
-pub fn base32path<R>(readable: R) -> io::Result<String>
+pub fn base32path<R>(readable: R) -> CsyncResult<String>
 where
     R: Read,
 {
@@ -37,7 +33,7 @@ where
     R: Read,
 {
     // encoding: Encoding, // what does the acutal encoding
-    encoder: Box<dyn Fn(&[u8]) -> io::Result<Vec<u8>>>,
+    encoder: Box<dyn Fn(&[u8]) -> CsyncResult<Vec<u8>>>,
     block_size: usize, // min number of input bytes that encode to a pad-less output
     source: BufReader<R>,
 
@@ -50,11 +46,13 @@ where
     src_buf_pull_size: usize, // ... `src_buf` ...
 }
 
+///
 impl<R> TextEncoder<R>
 where
     R: Read,
 {
-    pub fn new(source: R, encoding: &Encoding) -> io::Result<Self> {
+    ///
+    pub fn new(source: R, encoding: &Encoding) -> CsyncResult<Self> {
         let encoding = encoding.clone();
         let block_size = size_block(&encoding);
         TextEncoder::new_custom(
@@ -73,18 +71,21 @@ where
     /// 1. `encoding`
     /// 1. `encoder`:
     /// 1. `encoding`
-    pub fn new_custom(source: R, encoder: Box<dyn Fn(&[u8]) -> io::Result<Vec<u8>>>, block_size: usize) -> io::Result<Self> {
+    pub fn new_custom(source: R, encoder: Box<dyn Fn(&[u8]) -> CsyncResult<Vec<u8>>>, block_size: usize) -> CsyncResult<Self> {
         // assuming that pulling happens when size < block size,
         //
         // base32 = 5 -> 8, so shuold only pull bufsize * 5/8
-        let src_buf_pull_size = BUFFER_SIZE * block_size / 8;
+        let src_buf_pull_size = DEFAULT_BUFFER_SIZE * block_size / 8;
+
+        let source = BufReader::new(source);
+        let source_capacity = source.capacity();
 
         Ok(TextEncoder {
             block_size,
             encoder,
-            source: BufReader::with_capacity(BUFFER_SIZE, source),
-            enc_buf: VecDeque::with_capacity(BUFFER_SIZE),
-            src_buf: VecDeque::with_capacity(BUFFER_SIZE),
+            source,
+            enc_buf: VecDeque::with_capacity(source_capacity),
+            src_buf: VecDeque::with_capacity(source_capacity),
             src_buf_pull_size,
         })
     }
@@ -95,7 +96,7 @@ where
     /// `self.source`.
     fn replenish_src_buf(&mut self) -> io::Result<usize> {
         debug_assert!(self.src_buf.len() < self.block_size);
-        let mut buffer = [0u8; BUFFER_SIZE / 2];
+        let mut buffer = [0u8; DEFAULT_BUFFER_SIZE / 2];
         let bytes_read = self.source.read(&mut buffer[..])?;
         (&buffer[..bytes_read]).iter().for_each(|byte| self.src_buf.push_back(*byte));
         Ok(bytes_read)
@@ -132,10 +133,12 @@ where
 
 // read 40 bits at a time, because base32 needs 5bit, whereas a byte is 8 bits
 // read 5 bytes at a time
+///
 impl<R> Read for TextEncoder<R>
 where
     R: Read,
 {
+    ///
     fn read(&mut self, target: &mut [u8]) -> io::Result<usize> {
         // try pushing enc buf
         if self.enc_buf.len() == 0 {
@@ -163,7 +166,23 @@ where
     }
 }
 
-impl<R> CryptEncoder<R> for TextEncoder<R> where R: Read {}
+///
+impl<R> CryptEncoder<R> for TextEncoder<R>
+where
+    R: Read,
+{
+    ///
+    #[inline]
+    fn get_inner(self) -> Option<R> {
+        Some(self.source.into_inner())
+    }
+
+    ///
+    #[inline]
+    fn get_inner_ref(&self) -> Option<&R> {
+        None
+    }
+}
 
 ///////////////////////////////////////////////////////////////
 
@@ -175,46 +194,69 @@ where
     decoder: TextEncoder<R>,
 }
 
+///
 impl<R> TextDecoder<R>
 where
     R: Read,
 {
-    pub fn new(source: R, encoding: &Encoding) -> io::Result<Self> {
+    ///
+    pub fn new(source: R, encoding: &Encoding) -> CsyncResult<Self> {
         let encoding = encoding.clone();
         let block_size = size_block(&encoding);
         Ok(TextDecoder {
             decoder: TextEncoder::new_custom(
                 source,
-                Box::new(move |data| Ok(encoding.decode(data).map_err(io_err)?.into_iter().collect())),
+                Box::new(move |data| Ok(encoding.decode(data)?.into_iter().collect())),
                 block_size,
             )?,
         })
     }
 }
 
+///
 impl<R> Read for TextDecoder<R>
 where
     R: Read,
 {
+    ///
     fn read(&mut self, target: &mut [u8]) -> io::Result<usize> {
         self.decoder.read(target)
     }
 }
 
-impl<R> CryptEncoder<R> for TextDecoder<R> where R: Read {}
+///
+impl<R> CryptEncoder<R> for TextDecoder<R>
+where
+    R: Read,
+{
+    ///
+    #[inline]
+    fn get_inner(self) -> Option<R> {
+        Some(self.decoder.source.into_inner())
+    }
+
+    ///
+    #[inline]
+    fn get_inner_ref(&self) -> Option<&R> {
+        None
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use rayon::prelude::*;
 
+    ///
     mod encoder {
         use super::*;
 
+        ///
         mod base16 {
             use super::*;
             use std::str;
 
+            ///
             fn get_test_data<'a>() -> Vec<(&'a str, &'a str)> {
                 vec![
                     ("", ""),
@@ -228,6 +270,7 @@ mod tests {
                 ]
             }
 
+            ///
             #[test]
             fn parametrized() {
                 get_test_data().into_par_iter().for_each(|(input, expected)| {
@@ -242,10 +285,12 @@ mod tests {
             }
         }
 
+        ///
         mod base32 {
             use super::*;
             use std::str;
 
+            ///
             fn get_test_data<'a>() -> Vec<(&'a str, &'a str)> {
                 // generated with base32 in GNU coreutils
                 vec![
@@ -261,6 +306,7 @@ mod tests {
                 ]
             }
 
+            ///
             #[test]
             fn parametrized() {
                 get_test_data().into_par_iter().for_each(|(input, expected)| {
@@ -275,10 +321,12 @@ mod tests {
             }
         }
 
+        ///
         mod base32path {
             use super::*;
             use std::str;
 
+            ///
             fn get_test_data<'a>() -> Vec<(&'a str, &'a str)> {
                 // generated with base32 in GNU coreutils
                 vec![
@@ -294,6 +342,7 @@ mod tests {
                 ]
             }
 
+            ///
             #[test]
             fn parametrized() {
                 get_test_data().into_par_iter().for_each(|(input, expected)| {
@@ -305,10 +354,12 @@ mod tests {
             }
         }
 
+        ///
         mod base64 {
             use super::*;
             use std::str;
 
+            ///
             fn get_test_data<'a>() -> Vec<(&'a str, &'a str)> {
                 // generated with base64 in GNU coreutils
                 vec![
@@ -321,6 +372,7 @@ mod tests {
                 ]
             }
 
+            ///
             #[test]
             fn parametrized() {
                 get_test_data().into_par_iter().for_each(|(input, expected)| {
@@ -336,12 +388,15 @@ mod tests {
         }
     }
 
+    ///
     mod decoder {
         use super::*;
 
+        ///
         mod base16 {
             use super::*;
 
+            ///
             fn get_test_data<'a>() -> Vec<(&'a str, &'a str)> {
                 vec![
                     ("", ""),
@@ -355,6 +410,7 @@ mod tests {
                 ]
             }
 
+            ///
             #[test]
             fn parametrized() {
                 get_test_data().into_par_iter().for_each(|(expected, input)| {
@@ -369,9 +425,11 @@ mod tests {
             }
         }
 
+        ///
         mod base32 {
             use super::*;
 
+            ///
             fn get_test_data<'a>() -> Vec<(&'a str, &'a str)> {
                 // generated with base32 in GNU coreutils
                 vec![
@@ -387,6 +445,7 @@ mod tests {
                 ]
             }
 
+            ///
             #[test]
             fn parametrized() {
                 get_test_data().into_par_iter().for_each(|(expected, input)| {
@@ -401,9 +460,11 @@ mod tests {
             }
         }
 
+        ///
         mod base64 {
             use super::*;
 
+            ///
             fn get_test_data<'a>() -> Vec<(&'a str, &'a str)> {
                 // generated with base64 in GNU coreutils
                 vec![
@@ -416,6 +477,7 @@ mod tests {
                 ]
             }
 
+            ///
             #[test]
             fn parametrized() {
                 get_test_data().into_par_iter().for_each(|(expected, input)| {

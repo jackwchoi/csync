@@ -1,4 +1,4 @@
-#[macro_use]
 mod action;
+mod util;
 
-pub mod crypt_syncer;
+pub mod syncer;

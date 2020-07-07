@@ -1,110 +1,209 @@
-use crate::{fs_util::*, util::*};
+use crate::{fs_util::*, prelude::*, secure_vec::*, util::*};
 use rayon::prelude::*;
 use std::{
     collections::HashSet,
     fs::{copy, create_dir_all, metadata},
-    io::Read,
-    os::unix::fs::PermissionsExt,
+    io::{self, Read},
     path::{Path, PathBuf},
 };
-use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 
+pub const NUM_FILE_SAMPLES: usize = 16;
+
+pub fn hash_tree<P>(path: P) -> CsyncResult<CryptoSecureBytes>
+where
+    P: AsRef<Path>,
+{
+    let key_hash = sha512!(&b"SgG5U89uTcXiXqYA82H0zcCMbrmZw3wgfPJXeTROAEwzebmG9x268iGS8nuYWJLN"
+        .to_vec()
+        .into());
+
+    let mut ctx = {
+        let hmac_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA512, key_hash.0.unsecure());
+        ring::hmac::Context::with_key(&hmac_key)
+    };
+
+    let fail = walkdir::WalkDir::new(&path)
+        .sort_by(|a, b| a.file_name().cmp(b.file_name()))
+        .into_iter()
+        .map(|entry_res| -> CsyncResult<bool> {
+            let entry = entry_res?;
+            let file = fopen_r(entry.path())?;
+
+            let rel_path = subpath_par(entry.path(), &path).unwrap();
+            let entry_path_as_str = match rel_path.to_str() {
+                Some(as_str) => Ok(as_str),
+                None => csync_err!(PathContainsInvalidUtf8Bytes, entry.path().to_path_buf()),
+            }?;
+
+            // feed filename
+            ctx.update(entry_path_as_str.as_bytes());
+            // feed file permision bits
+            let perm_bits_as_u32 = perm_bits(&entry.path())?;
+            let perm_bits_as_u8s = u32_to_u8s(perm_bits_as_u32);
+            ctx.update(&perm_bits_as_u8s);
+
+            let mut buf_reader = std::io::BufReader::new(file);
+            let mut buffer = [0u8; DEFAULT_BUFFER_SIZE];
+
+            loop {
+                match buf_reader.read(&mut buffer) {
+                    Ok(0) => break Ok(true),
+                    Ok(bytes_read) => ctx.update(&buffer[..bytes_read]),
+                    Err(_) => break Ok(false),
+                }
+            }
+        })
+        .any(|res| res.is_err());
+
+    match fail {
+        true => csync_err!(Other, "hashing failed".to_string()),
+        false => Ok(CryptoSecureBytes(ctx.clone().sign().as_ref().to_vec().into())),
+    }
+}
+
+///
 pub fn drng_range(num_bytes: usize, min: u8, max: u8) -> Vec<u8> {
     assert!(min < max);
-    let seed: [u8; 32] = [0; 32];
+    let seed = CryptoSecureBytes(vec![0u8; 32].into());
 
     let min = min as f64;
     let max = max as f64;
     let width = max - min;
 
-    rng_seed!(&seed, num_bytes)
-        .into_iter()
+    rng_seed!(&seed, num_bytes).0.unsecure()
+        .iter()
+        .copied()
         .map(|byte| byte as f64 / std::u8::MAX as f64)   // [0, 255] -> [0, 1]
         .map(|ratio| width * ratio)                      // [0, 1] -> [0, width]
         .map(|adjusted| (adjusted + min).round() as u8) // [0, width] -> [min, max]
         .collect()
 }
 
+///
 #[inline]
-fn parent(path: &Path) -> &Path {
-    match path.parent() {
+pub fn ascii_files() -> impl Iterator<Item = PathBuf> {
+    find("src")
+        .map(Result::unwrap)
+        .filter(|pbuf| pbuf.is_file())
+        .map(|pbuf| pbuf.canonicalize().unwrap())
+}
+
+///
+#[inline]
+pub fn bin_files() -> impl Iterator<Item = PathBuf> {
+    find(".git")
+        .map(Result::unwrap)
+        .filter(|pbuf| pbuf.is_file())
+        .map(|pbuf| pbuf.canonicalize().unwrap())
+}
+
+///
+#[inline]
+fn parent_unwrap_safely<P>(path: &P) -> &Path
+where
+    P: AsRef<Path>,
+{
+    match path.as_ref().parent() {
         Some(par) => par,
         None => Path::new(""),
     }
 }
 
-fn cp_r(src: &Path, out_dir: &Path) {
-    let src_par = parent(src);
+pub fn dir_is_empty<P>(path: P) -> bool
+where
+    P: AsRef<Path>,
+{
+    path.as_ref().is_dir() && std::fs::read_dir(&path).unwrap().count() == 0
+}
 
-    WalkDir::new(src)
+///
+fn cp_r<P1, P2>(src: P1, out_dir: P2)
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    let src_par = parent_unwrap_safely(&src);
+
+    WalkDir::new(&src)
         .follow_links(false)
         .into_iter()
         .map(Result::unwrap)
         .for_each(|entry| {
             let pbuf = entry.path();
-            let rel_src_path = subpath(&pbuf, &src_par).unwrap();
-            let dest = out_dir.join(rel_src_path);
+            let dest = {
+                let rel_src_path = subpath(&pbuf, &src_par).unwrap();
+                out_dir.as_ref().join(rel_src_path)
+            };
 
-            create_dir_all(parent(&dest)).unwrap();
+            create_dir_all(parent_unwrap_safely(&dest)).unwrap();
 
             match entry.metadata().unwrap().is_dir() {
                 true => create_dir_all(&pbuf).unwrap(),
                 false => {
-                    assert!(parent(&dest).exists());
+                    assert!(parent_unwrap_safely(&dest).exists());
                     copy(&pbuf, &dest).unwrap();
                 }
             }
         });
 }
 
+///
 #[inline]
-pub fn basename(path: &Path) -> &str {
-    path.file_name().unwrap().to_str().unwrap()
+pub fn basename<P>(path: &P) -> Option<String>
+where
+    P: AsRef<Path>,
+{
+    path.as_ref().file_name()?.to_str().map(String::from)
 }
 
-#[inline]
-fn perm_bits(path: &Path) -> u32 {
-    metadata(path).unwrap().permissions().mode()
-}
+/// Check that two files are equivalent.
+///
+/// Two files are equivalent if all of the following properties of the two are the same:
+/// 1. basename
+/// 2. file content
+/// 3. unix permission bits
+fn assert_file_eq<P1, P2>(path_a: P1, path_b: P2)
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    let path_a = path_a.as_ref();
+    let path_b = path_b.as_ref();
 
-fn rand_file(seed: &[u8], size: usize) -> NamedTempFile {
-    let tmpf = tmpfile!().unwrap();
-    let seed_hash = hash1!(seed);
-
-    let rand_bytes = rng_seed!(&seed_hash[..], size);
-    tmpf
-}
-
-/// inefficient, only use for testing
-fn assert_file_eq(path_a: &Path, path_b: &Path) {
+    // both exist
+    assert!(path_b.exists() && path_b.exists());
     // basename ==
-    assert_eq!(basename(path_a), basename(path_b));
+    assert_eq!(basename(&path_a).unwrap(), basename(&path_b).unwrap());
     // permission bits ==
-    assert_eq!(perm_bits(path_a), perm_bits(path_b));
+    assert_eq!(perm_bits(&path_a).unwrap(), perm_bits(&path_b).unwrap());
 
-    match path_a.is_dir() {
-        // if dir, just check that the two dirs are in fact dirs
-        true => assert!(path_b.exists() && path_b.is_dir()),
-        // if file,
-        false => {
+    //
+    match (path_a.is_dir(), path_b.is_dir(), path_a.is_file(), path_b.is_file()) {
+        (true, true, false, false) => (),
+        (false, false, true, true) => {
             let bytes = |path| fopen_r(&path).unwrap().bytes().map(Result::unwrap);
             let bytes_a = bytes(path_a);
             let bytes_b = bytes(path_b);
 
-            assert!(iter_eq(bytes_a, bytes_b), "files {:?} != {:?}", path_a, path_b,);
+            assert!(iter_eq(bytes_a, bytes_b));
         }
-    };
+        _ => panic!(),
+    }
 }
 
 /// inefficient, only use for testing
-pub fn assert_tree_eq(a: &Path, b: &Path) {
+pub fn assert_tree_eq<P1, P2>(a: P1, b: P2)
+where
+    P1: AsRef<Path> + Sync,
+    P2: AsRef<Path> + Sync,
+{
     // basename ==
-    assert_eq!(basename(a), basename(b));
+    assert_eq!(basename(&a), basename(&b));
     // permission bits ==
-    assert_eq!(perm_bits(a), perm_bits(b));
+    assert_eq!(perm_bits(&a).unwrap(), perm_bits(&b).unwrap());
 
-    match (a.is_dir(), b.is_dir()) {
+    match (a.as_ref().is_dir(), b.as_ref().is_dir()) {
         (false, false) => assert_file_eq(a, b),
         (true, true) => {
             let (a_paths, b_paths) = {
@@ -114,32 +213,43 @@ pub fn assert_tree_eq(a: &Path, b: &Path) {
                         .map(|p| subpath(&p, root).unwrap())
                         .collect::<HashSet<_>>()
                 };
-                (paths(a), paths(b))
+                (paths(a.as_ref()), paths(b.as_ref()))
             };
-            assert_eq!(&a_paths.len(), &b_paths.len());
+            if a_paths.len() != b_paths.len() {
+                panic!();
+            }
 
             {
                 let dirs = |ps: &HashSet<PathBuf>| ps.par_iter().cloned().filter(|p| p.is_dir()).collect::<HashSet<_>>();
                 let a_dirs = dirs(&a_paths);
                 let b_dirs = dirs(&b_paths);
-                assert_eq!(a_dirs, b_dirs);
+                if a_dirs != b_dirs {
+                    panic!();
+                }
             }
             let rel_paths = {
                 let files = |ps: &HashSet<PathBuf>| ps.par_iter().cloned().filter(|p| p.is_file()).collect::<HashSet<_>>();
                 let a_files = files(&a_paths);
                 let b_files = files(&b_paths);
-                assert_eq!(a_files, b_files);
+                if a_files != b_files {
+                    panic!();
+                }
                 a_files // ok because these 2 sets are eq
             };
 
             rel_paths.into_par_iter().for_each(|rel_path| {
-                let a_path = a.join(&rel_path);
-                let b_path = b.join(&rel_path);
+                let a_path = a.as_ref().join(&rel_path);
+                let b_path = b.as_ref().join(&rel_path);
 
                 assert_file_eq(&a_path, &b_path);
             });
+
+            let a_hash = hash_tree(a).unwrap();
+            let b_hash = hash_tree(b).unwrap();
+
+            assert_eq!(a_hash, b_hash);
         }
-        _ => panic!("one is dir and another is file"),
+        _ => panic!(),
     }
 }
 
@@ -149,15 +259,18 @@ mod tests {
     use colmac::*;
     use std::fs::File;
 
+    ///
     #[inline]
     fn rel_paths(path: &Path, root: &Path) -> HashSet<PathBuf> {
         find(path).map(Result::unwrap).map(|p| subpath(&p, root).unwrap()).collect()
     }
 
+    ///
     mod cp_r {
         use super::*;
         use std::io::Write;
 
+        ///
         macro_rules! f_with {
             ( $path:expr, $( $line:expr ),* ) => {{
                 {
@@ -171,17 +284,19 @@ mod tests {
             }};
         }
 
+        ///
         #[test]
         fn individual_files() {
             find("src").par_bridge().map(Result::unwrap).for_each(|src_path| {
                 let out_dir = tmpdir!().unwrap();
-                let dst_path = out_dir.path().join(basename(&src_path));
+                let dst_path = out_dir.path().join(basename(&src_path).unwrap());
 
                 cp_r(&src_path, out_dir.path());
                 assert_file_eq(&src_path, &dst_path);
             });
         }
 
+        ///
         #[test]
         fn empty_dirs() {
             let tmpd = tmpdir!().unwrap();
@@ -201,6 +316,7 @@ mod tests {
             assert_eq!(ls(d2).unwrap().count(), 0);
         }
 
+        ///
         #[test]
         fn flat_dir_with_files() {
             let src = Path::new("src/encoder");
@@ -222,6 +338,7 @@ mod tests {
             });
         }
 
+        ///
         #[test]
         fn nested_dir() {
             let src = tmpdir!().unwrap();
@@ -261,6 +378,7 @@ mod tests {
         }
     }
 
+    ///
     mod assert_tree_eq {
         use super::*;
         macro_rules! sugar_assert {
@@ -269,11 +387,13 @@ mod tests {
             };
         }
 
+        ///
         #[test]
         fn reflexivity() {
             find("src").par_bridge().map(Result::unwrap).for_each(|p| sugar_assert!(p, p));
         }
 
+        ///
         #[test]
         fn two_empty_dirs_with_same_name() {
             let tmpd1 = tmpdir!().unwrap();
@@ -288,6 +408,7 @@ mod tests {
             sugar_assert!(d1, d2);
         }
 
+        ///
         #[test]
         fn two_empty_files_with_same_name() {
             let tmpd1 = tmpdir!().unwrap();
@@ -302,6 +423,7 @@ mod tests {
             sugar_assert!(f1, f2);
         }
 
+        ///
         #[test]
         fn flat_dir_with_files() {
             let tmpd = tmpdir!().unwrap();
@@ -315,14 +437,17 @@ mod tests {
             sugar_assert!(src_dir, out_dir.join("encoder"));
         }
 
+        ///
         mod should_panic {
             use super::*;
 
+            ///
             #[should_panic]
             fn one_dir_is_empty() {
                 sugar_assert!("src", tmpdir!().unwrap().path());
             }
 
+            ///
             #[test]
             #[should_panic]
             fn two_empty_dirs_with_diff_name() {
@@ -331,6 +456,7 @@ mod tests {
                 sugar_assert!(d1.path(), d2.path());
             }
 
+            ///
             #[test]
             #[should_panic]
             fn two_empty_files_with_diff_name() {
@@ -339,8 +465,10 @@ mod tests {
                 sugar_assert!(f1.path(), f2.path());
             }
 
+            ///
             macro_rules! gen {
                 ( $fname:ident, $root_a:literal, $root_b:literal ) => {
+                    ///
                     #[test]
                     #[should_panic]
                     fn $fname() {
@@ -357,7 +485,7 @@ mod tests {
 
             gen!(one_is_subdir, "src/", "src/encoder");
 
-            gen!(different_files, "src/main.rs", "src/crypt/crypt_syncer.rs");
+            gen!(different_files, "src/main.rs", "src/crypt/syncer.rs");
         }
     }
 }

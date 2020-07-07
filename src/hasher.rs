@@ -1,127 +1,103 @@
 pub use crate::encoder::text::*;
-use crate::util::*;
+use crate::{prelude::*, secure_vec::*};
 use ring::{digest, pbkdf2};
-use std::{
-    io::{self, Read},
-    num::NonZeroU32,
-};
+use scrypt::{scrypt, ScryptParams};
+use std::num::NonZeroU32;
 
-pub const PBKDF2_NUM_ITER_DEFAULT: u32 = 1 << 17; // default number of iterations for pbkdf2, 2^17 = 131,072
-pub const PBKDF2_SALT_DEFAULT: [u8; 16] = [0; 16]; // default salt to use for pbkdf2
-pub static PBKDF2_ALGORITHM: pbkdf2::Algorithm = pbkdf2::PBKDF2_HMAC_SHA512; // default hash algorithm to use for pbkdf2
-const PBKDF2_OUTPUT_LEN: usize = digest::SHA512_OUTPUT_LEN; // number of bytes that pbkdf2 should output
-
-// static assertions about the consts above
-const_assert!(PBKDF2_NUM_ITER_DEFAULT == 131072);
-const_assert!(PBKDF2_OUTPUT_LEN == 64);
-const_assert!(PBKDF2_SALT_DEFAULT.len() == 16);
-
-/// Hash key with default configs using `pbkdf2`.
-///
-/// Configs used are:
-///
-/// 1. `PBKDF2_NUM_ITER_DEFAULT` number of iterations
-/// 1. `PBKDF2_SALT_DEFAULT` as the salt
-///
-/// # Parameters
-///
-/// 1. `key`: the input bytes to hash
-///
-/// # Returns
-///
-/// 64-byte hash of the input key as `Vec<u8>`
-macro_rules! hash {
-    ( $num_iter:expr, $key:expr ) => {
-        crate::hasher::hash_custom($key, None, Some($num_iter))
-    };
-    ( $num_iter:expr, $key:expr, $salt:expr ) => {
-        crate::hasher::hash_custom($key, Some($salt), Some($num_iter))
-    };
-}
-
-/// Hash key with default configs using `pbkdf2`, except with 1 iteration.
-///
-/// Configs used are:
-///
-/// 1. 1 number of iteration
-/// 1. `PBKDF2_SALT_DEFAULT` as the salt
-///
-/// # Parameters
-///
-/// 1. `key`: the input bytes to hash
-///
-/// # Returns
-///
-/// 64-byte hash of the input key as `Vec<u8>`
-macro_rules! hash1 {
+macro_rules! sha512 {
     ( $key:expr ) => {
-        crate::hasher::hash_custom($key, None, Some(1))
+        pbkdf2!(ring::pbkdf2::PBKDF2_HMAC_SHA512, 1, $key)
     };
     ( $key:expr, $salt:expr ) => {
-        crate::hasher::hash_custom($key, Some($salt), Some(1))
+        pbkdf2!(ring::pbkdf2::PBKDF2_HMAC_SHA512, 1, $key, $salt)
     };
 }
 
-/// Hash key with custom configs using `pbkdf2`.
-///
-/// Configs used are:
-///
-/// # Parameters
-///
-/// 1. `key`: the input bytes to hash
-/// 1. `opt_salt`: if provided, it will be hashed with this function with 1 iteration and
-///    PBKDF2_SALT_DEFAULT and the first 16 bytes are used. PBKDF2_SALT_DEFAULT is used otherwise.
-/// 1. `opt_num_iter`: number of PBKDF2 iterations; `PBKDF2_NUM_ITER_DEFAULT` is used if `None`
-///
-/// # Returns
-///
-/// 64-byte hash of the input key.
-pub fn hash_custom(key: &[u8], opt_salt: Option<&[u8]>, opt_num_iter: Option<u32>) -> Vec<u8> {
+macro_rules! pbkdf2 {
+    ( $alg:expr, $num_iter:expr, $key:expr ) => {
+        crate::hasher::pbkdf2_custom($alg, $num_iter, None, $key)
+    };
+    ( $alg:expr, $num_iter:expr, $key:expr, $salt:expr ) => {
+        crate::hasher::pbkdf2_custom($alg, $num_iter, Some($salt), $key)
+    };
+}
+
+macro_rules! scrypt {
+    ( $key:expr ) => {
+        scrypt!(impl $key, None, None, None)
+    };
+    ( $key:expr, $salt:expr ) => {
+        scrypt!(impl $key, Some($salt), None, None)
+    };
+    ( $key:expr, $salt:expr, $params:expr ) => {
+        scrypt!(impl $key, Some($salt), Some($params), None)
+    };
+    ( $key:expr, $salt:expr, $params:expr, $output_len:expr ) => {
+        scrypt!(impl $key, Some($salt), Some($params), Some($output_len))
+    };
+    ( impl $key:expr, $salt_opt:expr, $params_opt:expr, $output_len_opt:expr ) => {
+        crate::hasher::scrypt_custom($params_opt, $output_len_opt, $salt_opt, $key)
+    };
+}
+
+/// output_len_opt must be less than
+pub fn scrypt_custom(
+    params_opt: Option<ScryptParams>,
+    output_len_opt: Option<usize>,
+    salt_opt: Option<&CryptoSecureBytes>,
+    key: &SecureBytes,
+) -> CsyncResult<CryptoSecureBytes> {
+    //
+    let salt = match salt_opt {
+        Some(s) => s.clone(),
+        None => CryptoSecureBytes(DEFAULT_SALT.to_vec().into()),
+    };
+    //
+    let params = params_opt.unwrap_or({
+        let log_n = 15;
+        let r = 8;
+        let p = 1;
+        ScryptParams::new(log_n, r, p)?
+    });
+
+    let output_len = output_len_opt.unwrap_or(DEFAULT_SCRYPT_OUTPUT_LEN);
+
+    let mut buffer = vec![0u8; output_len];
+    scrypt(key.unsecure(), salt.0.unsecure(), &params, &mut buffer[..])?;
+
+    Ok(buffer).map(SecureVec::from).map(CryptoSecureBytes)
+}
+
+pub fn pbkdf2_custom(
+    alg: pbkdf2::Algorithm,
+    num_iter: u32,
+    opt_salt: Option<&CryptoSecureBytes>,
+    key: &SecureBytes,
+) -> CryptoSecureBytes {
     // default to PBKDF2_NUM__ITER_DEFAULT
-    let num_iter = opt_num_iter.unwrap_or(PBKDF2_NUM_ITER_DEFAULT);
     if num_iter == 0 {
         panic!("opt_num_iter cannot be 0");
     }
 
-    // if salt is provided, hash it again asd use the first 16 bytes
-    // else use the default hash
-    let salt: Vec<u8> = match opt_salt {
-        Some(s) if s.len() < 16 => hash_custom(s, None, Some(1)).into_iter().take(16).collect(),
-        Some(s) => Vec::from(&s[..16]),
-        None => Vec::from(&PBKDF2_SALT_DEFAULT[..]),
+    let salt = match opt_salt {
+        Some(s) => s.clone(),
+        None => CryptoSecureBytes(DEFAULT_SALT.to_vec().into()),
     };
 
-    // required by pbkdf2
-    debug_assert_eq!(16, salt.len());
+    match alg == pbkdf2::PBKDF2_HMAC_SHA512 {
+        true => {
+            let mut buffer = [0u8; digest::SHA512_OUTPUT_LEN];
+            pbkdf2::derive(
+                alg,
+                NonZeroU32::new(num_iter).unwrap(),
+                salt.0.unsecure(),
+                key.unsecure(),
+                &mut buffer[..],
+            );
 
-    let mut buffer = [0u8; PBKDF2_OUTPUT_LEN];
-    pbkdf2::derive(
-        PBKDF2_ALGORITHM,
-        NonZeroU32::new(num_iter).unwrap(),
-        &salt[..],
-        key,
-        &mut buffer[..],
-    );
-
-    Vec::from(&buffer[..])
-}
-
-/// Calculate a SHA512 checksum of the input.
-pub fn sha512_read<R>(file: &mut R) -> io::Result<Vec<u8>>
-where
-    R: Read,
-{
-    let mut buffer = [0u8; BUFFER_SIZE];
-    let mut context = digest::Context::new(&digest::SHA512);
-
-    loop {
-        match file.read(&mut buffer)? {
-            0 => {
-                let digest = context.finish();
-                break Ok(Vec::from(digest.as_ref()));
-            }
-            bytes_read => context.update(&buffer[..bytes_read]),
+            CryptoSecureBytes(buffer.to_vec().into())
         }
+        false => todo!(),
     }
 }
 
@@ -130,47 +106,63 @@ mod tests {
     use super::*;
     use crate::fs_util::*;
     use rayon::prelude::*;
-    use std::collections::HashSet;
-    use std::fs::File;
+    use ring::pbkdf2::PBKDF2_HMAC_SHA512;
+    use std::{collections::HashSet, fs::File};
 
+    ///
     fn keys<'a>() -> Vec<&'a str> {
         vec!["", "a", "asf", "123", "asfoij123r98!@$%#@$Q%#$T"]
     }
 
-    fn salt_lengths() -> Vec<u8> {
-        vec![0, 1, 2, 4, 8, 16, 32, 64]
-    }
-
+    ///
     mod fix_algorithms {
         use super::*;
 
+        ///
         #[test]
         fn fix_hash1() {
-            let key_bytes = "4s5nRZ8dL0OLdBvYWFR48u9VfbGdLfC3".as_bytes();
-            let result = hash1!(key_bytes);
+            let key_bytes = b"4s5nRZ8dL0OLdBvYWFR48u9VfbGdLfC3";
+            let result = sha512!(&key_bytes.to_vec().into());
             let expected = vec![
-                242, 209, 3, 16, 92, 90, 71, 234, 5, 78, 222, 209, 254, 200, 76, 0, 197, 176, 129, 154, 5, 213, 178, 164, 255,
-                103, 170, 92, 9, 97, 96, 188, 30, 152, 236, 186, 30, 80, 9, 63, 204, 51, 43, 61, 101, 22, 10, 253, 246, 34, 69,
-                59, 63, 34, 0, 98, 132, 122, 184, 136, 173, 242, 20, 199,
+                242, 72, 60, 218, 195, 187, 91, 79, 146, 228, 160, 73, 95, 113, 12, 96, 151, 29, 210, 204, 202, 126, 174, 93,
+                252, 68, 60, 67, 54, 246, 20, 206, 84, 141, 104, 243, 71, 222, 86, 113, 196, 187, 56, 127, 233, 205, 200, 70,
+                166, 20, 93, 103, 19, 180, 53, 82, 108, 139, 98, 187, 51, 13, 126, 211,
             ];
-            assert_eq!(result, expected);
-            assert_eq!(hash_custom(key_bytes, None, Some(1)), expected);
+            assert_eq!(result.0.unsecure(), &expected[..]);
+            assert_eq!(
+                pbkdf2_custom(PBKDF2_HMAC_SHA512, 1, None, &key_bytes.to_vec().into(),)
+                    .0
+                    .unsecure(),
+                &expected[..]
+            );
         }
 
+        ///
         #[test]
-        fn fix_hash1_with_keys() {
-            let key_bytes = "[200~l1cIATc3DL6UC37Qejf88K23eTXiVtTm".as_bytes();
+        fn fix_hash1_with_salt() {
+            let key_bytes = b"[200~l1cIATc3DL6UC37Qejf88K23eTXiVtTm";
             let salt = [3u8; 16];
-            let result = hash1!(key_bytes, &salt);
+            let result = sha512!(&key_bytes.to_vec().into(), &CryptoSecureBytes(salt.to_vec().into()));
             let expected = vec![
                 141, 3, 202, 69, 42, 133, 247, 50, 207, 50, 79, 25, 217, 38, 93, 41, 150, 190, 37, 60, 186, 207, 85, 88, 4,
                 118, 242, 238, 136, 224, 76, 138, 141, 3, 113, 151, 50, 4, 105, 228, 15, 135, 166, 113, 148, 236, 250, 117,
                 177, 162, 33, 39, 71, 238, 41, 29, 82, 31, 178, 204, 219, 171, 15, 10,
             ];
-            assert_eq!(result, expected);
-            assert_eq!(hash_custom(key_bytes, Some(&salt), Some(1)), expected);
+            assert_eq!(result.0.unsecure(), &expected[..]);
+            assert_eq!(
+                pbkdf2_custom(
+                    PBKDF2_HMAC_SHA512,
+                    1,
+                    Some(&CryptoSecureBytes(salt.to_vec().into())),
+                    &key_bytes.to_vec().into()
+                )
+                .0
+                .unsecure(),
+                &expected[..]
+            );
         }
 
+        ///
         #[test]
         fn fix_hash() {
             let key_bytes = b"14ys8k0MQUEXjIq7oZd8pKFh11851yr5";
@@ -178,30 +170,36 @@ mod tests {
                 (
                     1 << 16,
                     vec![
-                        55, 188, 78, 11, 109, 252, 230, 30, 162, 183, 97, 71, 105, 40, 182, 83, 131, 9, 42, 142, 224, 41, 176,
-                        110, 188, 251, 202, 102, 101, 76, 59, 15, 122, 141, 162, 161, 171, 197, 73, 135, 0, 144, 215, 208, 91,
-                        72, 6, 248, 220, 104, 219, 114, 215, 45, 92, 164, 246, 118, 135, 23, 157, 227, 82, 10,
+                        144, 167, 4, 157, 226, 39, 104, 174, 154, 94, 88, 66, 170, 97, 74, 3, 107, 127, 41, 100, 115, 62, 6,
+                        11, 189, 132, 168, 197, 86, 48, 184, 215, 156, 63, 150, 163, 149, 180, 130, 206, 5, 26, 24, 215, 224,
+                        189, 231, 168, 185, 96, 16, 54, 171, 113, 153, 227, 74, 196, 203, 108, 106, 66, 126, 133,
                     ],
                 ),
                 (
                     1 << 17,
                     vec![
-                        57, 40, 12, 174, 25, 7, 196, 243, 252, 220, 104, 37, 65, 10, 152, 231, 118, 25, 100, 42, 88, 186, 155,
-                        190, 114, 89, 56, 189, 222, 158, 44, 189, 17, 83, 144, 213, 89, 122, 162, 251, 243, 140, 250, 138, 204,
-                        107, 14, 93, 99, 127, 70, 0, 67, 24, 81, 86, 66, 53, 182, 161, 194, 74, 173, 45,
+                        181, 26, 5, 27, 48, 163, 110, 49, 49, 27, 124, 1, 124, 241, 165, 121, 53, 38, 147, 198, 180, 105, 71,
+                        249, 55, 90, 82, 6, 154, 140, 247, 97, 15, 122, 136, 250, 54, 3, 232, 169, 79, 60, 231, 227, 161, 227,
+                        55, 86, 67, 132, 184, 82, 149, 144, 195, 255, 146, 239, 7, 26, 139, 15, 108, 225,
                     ],
                 ),
             ]
             .into_par_iter()
             .for_each(|(num_iter, expected)| {
-                let result = hash!(num_iter, key_bytes);
-                assert_eq!(result, expected);
-                assert_eq!(hash_custom(key_bytes, None, Some(num_iter)), expected);
+                let result = pbkdf2!(PBKDF2_HMAC_SHA512, num_iter, &SecureVec::new(key_bytes.to_vec()));
+                assert_eq!(result.0.unsecure(), &expected[..]);
+                assert_eq!(
+                    pbkdf2_custom(PBKDF2_HMAC_SHA512, num_iter, None, &key_bytes.to_vec().into())
+                        .0
+                        .unsecure(),
+                    &expected[..]
+                );
             });
         }
 
+        ///
         #[test]
-        fn fix_hash_with_keys() {
+        fn fix_hash_with_salt() {
             let key_bytes = b"9BGVrWW5FKl4qtvMXuI67ag8PpXqVV94";
             let salt = [3u8; 16];
             vec![
@@ -224,126 +222,79 @@ mod tests {
             ]
             .into_par_iter()
             .for_each(|(num_iter, expected)| {
-                let result = hash!(num_iter, key_bytes, &salt);
-                assert_eq!(result, expected);
-                assert_eq!(hash_custom(key_bytes, Some(&salt), Some(num_iter)), expected);
+                let result = pbkdf2!(
+                    PBKDF2_HMAC_SHA512,
+                    num_iter,
+                    &key_bytes.to_vec().into(),
+                    &CryptoSecureBytes(salt.to_vec().into())
+                );
+                assert_eq!(result.0.unsecure(), &expected[..]);
+                assert_eq!(
+                    pbkdf2_custom(
+                        PBKDF2_HMAC_SHA512,
+                        num_iter,
+                        Some(&CryptoSecureBytes(salt.to_vec().into())),
+                        &key_bytes.to_vec().into()
+                    )
+                    .0
+                    .unsecure(),
+                    &expected[..]
+                );
             });
         }
     }
 
+    ///
+    #[test]
+    fn hash_is_deterministic() {
+        let salt = sha512!(&b"SvMHNJuEsuH3Sx7F4lBOipHogxFdJHl2ySmw9lBzNhMSR6bM8VtyRwHzzQ6AyQVp"
+            .to_vec()
+            .into());
+        // for each key
+        keys().into_par_iter().for_each(|key| {
+            // for each num iter
+            let hashes: HashSet<_> = (0..4)
+                .map(|_| pbkdf2_custom(PBKDF2_HMAC_SHA512, 3, Some(&salt), &key.to_string().into()))
+                .collect();
+
+            // all hashes are identical
+            assert_eq!(1, hashes.len());
+            // the hashes are 64 bytes in length
+            assert_eq!(64, hashes.iter().nth(0).unwrap().0.unsecure().len());
+        });
+    }
+
+    /*
+    ///
     #[test]
     fn hash_is_deterministic() {
         // for each key
         keys().into_par_iter().for_each(|key| {
             // for each salt length
-            salt_lengths()
+            vec![0, 1, 2, 4, 8, 16, 32, 64]
                 .into_par_iter()
                 .map(|len| (0..len).collect::<Vec<_>>())
                 .for_each(|salt| {
                     // for each num iter
                     (1..4).for_each(|num_iter| {
                         let set: HashSet<_> = (0..4)
-                            .map(|_| hash_custom(key.as_bytes(), Some(&salt), Some(num_iter)))
+                            .map(|_| {
+                                pbkdf2_custom(
+                                    PBKDF2_HMAC_SHA512,
+                                    num_iter,
+                                    Some(&salt.to_vec().into()),
+                                    &key.to_string().into(),
+                                )
+                            })
                             .collect();
 
                         // all hashes are identical
                         assert_eq!(1, set.len());
                         // the hashes are 64 bytes in length
-                        assert_eq!(64, set.iter().nth(0).unwrap().len());
+                        assert_eq!(64, set.iter().nth(0).unwrap().unsecure().len());
                     })
                 });
         });
     }
-
-    mod sha512_read {
-        use super::*;
-        use std::io::Write;
-
-        macro_rules! file {
-            ( $root:expr, $filename:expr ) => {{
-                let path = $root.path().join($filename);
-                {
-                    fopen_w(&path).unwrap();
-                }
-                File::open(path).unwrap()
-            }};
-            ( $root:expr, $filename:expr, $content:expr ) => {{
-                let path = $root.path().join($filename);
-                {
-                    let mut file = fopen_w(&path).unwrap();
-                    file.write($content).unwrap();
-                }
-                File::open(path).unwrap()
-            }};
-        }
-
-        /// 1. 2 of the 3 files are empty, so the se tof the checksums is size 2
-        #[test]
-        fn empty_files() {
-            let dir = tmpdir!().unwrap();
-            let checksums: HashSet<_> = vec![
-                file!(dir, "tXryV7s9WWPM7ljK7OQ2YL5bBpe0zKD6"),
-                file!(dir, "1FINZBhrkWruNGgiQwdCEXyhpZDxmQxl"),
-                file!(dir, "CacAccgKVUvVQgvuwsJq5WwdDdRk2bDn", b"yWv0UUzc53KLoipjfSVvmAPf4fm2QebD"),
-            ]
-            .par_iter_mut()
-            .map(sha512_read)
-            .map(Result::unwrap)
-            .collect();
-
-            assert_eq!(checksums.len(), 2);
-        }
-
-        /// 1. 2 of the 3 files have the same content, so the set of the checksums is size 2
-        #[test]
-        fn content_collisions() {
-            let dir = tmpdir!().unwrap();
-            let checksums: HashSet<_> = vec![
-                file!(dir, "iLPCceoxfqvFpNJ4CIMEeeoG8J9D0zxY", b"1XU5qM4XPJlt97T1QpA6OJRrw34EvKXY"),
-                file!(dir, "CyirAhBFFAmbcTBSJf0weN6VisU9RaUX", b"bbUlD2vEWsN94JwgHVmCnmlYSdZ28dZc"),
-                file!(dir, "hJrHYoXJSIHOXnqhAj5umrzcOTTnn0cI", b"bbUlD2vEWsN94JwgHVmCnmlYSdZ28dZc"),
-            ]
-            .par_iter_mut()
-            .map(sha512_read)
-            .map(Result::unwrap)
-            .collect();
-
-            assert_eq!(checksums.len(), 2);
-        }
-
-        /// 1. 3 of the 4 files have the same content, so the set of the checksums is size 2
-        /// 2. make sure that after reading `n` bytes from a file, the checksum function discards
-        ///    those bytes when computing the hash
-        #[test]
-        fn mutated_files() {
-            let dir = tmpdir!().unwrap();
-
-            // file3 will have `common` as its content, while file4 will have the bytes `abcd`
-            // followed by `common`
-            let common = "zEHseHP8Pelv8Rm78mi1OVp3bPAqxjve";
-            let common_with_junk = format!("abcd{}", common);
-
-            // read 4 bytes from the file, and return the mutated file
-            let mutated = {
-                let mut mutated = file!(dir, "mbkiLksWk7QvlogMykQGrEQOGe1rH3cN", common_with_junk.as_bytes());
-                let mut buffer = [0u8; 4];
-                mutated.read(&mut buffer).unwrap();
-                assert_eq!(&buffer[..], b"abcd");
-                mutated
-            };
-
-            let checksums: HashSet<_> = vec![
-                file!(dir, "E9xQqcHyvGSRvbfPsSH6KbYAVkFgT3sX", b"zDK6ePdXfZ9kN8acogTYvVujh2aCPbM2"),
-                file!(dir, "yyuV7ASsoMnNZnhLcfgDIeemDCZj3ggv", b"bK0XunltMMAeq9ViE33WtP4gwOnb0UIY"),
-                file!(dir, "s53EX50oyakRf2lVGUdFdpFjzhe0Cniq", common.as_bytes()),
-                mutated,
-            ]
-            .par_iter_mut()
-            .map(sha512_read)
-            .map(Result::unwrap)
-            .collect();
-
-            assert_eq!(checksums.len(), 3);
-        }
-    }
+    */
 }
