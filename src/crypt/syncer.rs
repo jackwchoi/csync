@@ -487,6 +487,7 @@ fn report_syncer_spec(spec: &SyncerSpec) {
             verbose,
         } if *verbose => {
             eprintln!("\n{}ing: {:?} -> {:?}", action, source, out_dir);
+            eprintln!();
             eprintln_body!("Random salt", ("", format!("{}-bit", 8 * init_salt.0.unsecure().len())));
             eprintln_body!("Spread depth", ("", format!("{}", **spread_depth)));
             eprintln_body!(

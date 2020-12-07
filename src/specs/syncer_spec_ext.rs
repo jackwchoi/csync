@@ -78,6 +78,10 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
             false => csync_err!(SourceDoesNotExist, source.clone()),
         }?;
 
+        // TODO
+        // as the first iteration of the proj, assert that outdir is empty 
+        todo!();
+
         Ok(match (clean, decrypt) {
             (true, _) => {
                 SyncerSpecExt::Clean {
