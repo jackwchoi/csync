@@ -73,14 +73,6 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
             verbose,
             ..
         } = opts;
-        let source = match source.exists() {
-            true => Ok(source),
-            false => csync_err!(SourceDoesNotExist, source.clone()),
-        }?;
-
-        // TODO
-        // as the first iteration of the proj, assert that outdir is empty 
-        todo!();
 
         Ok(match (clean, decrypt) {
             (true, _) => {

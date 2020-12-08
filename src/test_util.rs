@@ -10,6 +10,18 @@ use walkdir::WalkDir;
 
 pub const NUM_FILE_SAMPLES: usize = 16;
 
+///
+pub fn find<P>(root: P) -> impl Iterator<Item = CsyncResult<PathBuf>>
+where
+    P: AsRef<Path>,
+{
+    WalkDir::new(root).follow_links(true).into_iter().map(|entry| {
+        entry
+            .map(walkdir::DirEntry::into_path)
+            .map_err(|err| CsyncErr::Other(format!("{}", err)))
+    })
+}
+
 pub fn hash_tree<P>(path: P) -> CsyncResult<CryptoSecureBytes>
 where
     P: AsRef<Path>,
@@ -312,8 +324,8 @@ mod tests {
             assert!(d1.exists());
             assert!(d2.exists());
 
-            assert_eq!(ls(d1).unwrap().count(), 0);
-            assert_eq!(ls(d2).unwrap().count(), 0);
+            assert_eq!(std::fs::read_dir(d1).unwrap().count(), 0);
+            assert_eq!(std::fs::read_dir(d2).unwrap().count(), 0);
         }
 
         ///

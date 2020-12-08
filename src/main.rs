@@ -33,6 +33,7 @@ mod crypt;
 mod tests_e2e;
 
 use crate::{clargs::*, crypt::syncer::*, prelude::*, secure_vec::*, specs::prelude::*, util::*};
+use ansi_term::Colour::Green;
 use rayon::prelude::*;
 use std::{
     convert::TryFrom,
@@ -41,7 +42,6 @@ use std::{
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
-use ansi_term::Colour::Green;
 
 #[derive(Clone, Debug)]
 struct RunResult {
@@ -173,7 +173,7 @@ impl SyncStats {
 // TODO use macro to circomvent this again
 ///
 fn run(opts: &Opts) -> CsyncResult<RunResult> {
-    let cleaned_opts = SyncerSpecExt::try_from(opts)?;
+    let external_spec = SyncerSpecExt::try_from(opts)?;
 
     let init_key = get_password()?;
 
@@ -269,11 +269,11 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
         }};
     }
 
-    let syncer = Syncer::new(&cleaned_opts, InitialKey(init_key))?;
+    let syncer = Syncer::new(&external_spec, InitialKey(init_key))?;
 
     // use macro here because `actions = syncer.$action()?` results in an opaque type, which makes
     // match arms have incompatible type
-    Ok(match cleaned_opts {
+    Ok(match external_spec {
         SyncerSpecExt::Encrypt { verbose, .. } => handle!(syncer, sync_enc, verbose),
         SyncerSpecExt::Decrypt { verbose, .. } => handle!(syncer, sync_dec, verbose),
         SyncerSpecExt::Clean { .. } => todo!(),

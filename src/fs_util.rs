@@ -55,24 +55,6 @@ macro_rules! tmpdir {
 
 ///
 #[inline]
-pub fn perm_bits<P>(path: &P) -> std::io::Result<u32>
-where
-    P: AsRef<Path>,
-{
-    Ok(std::fs::metadata(path)?.permissions().mode())
-}
-
-///
-#[inline]
-pub fn is_canonical<P>(path: P) -> std::io::Result<bool>
-where
-    P: AsRef<Path>,
-{
-    Ok(&path.as_ref().canonicalize()? == path.as_ref())
-}
-
-///
-#[inline]
 pub fn mktemp_file(out_dir: Option<&Path>, prefix: &str, suffix: &str) -> std::io::Result<NamedTempFile> {
     tempfile::Builder::new()
         .prefix(prefix)
@@ -91,33 +73,29 @@ pub fn mktemp_dir(out_dir: Option<&Path>, prefix: &str, suffix: &str) -> std::io
 
 ///
 #[inline]
+pub fn perm_bits<P>(path: &P) -> std::io::Result<u32>
+where
+    P: AsRef<Path>,
+{
+    Ok(std::fs::metadata(path)?.permissions().mode())
+}
+
+///
+#[inline]
+pub fn is_canonical<P>(path: P) -> std::io::Result<bool>
+where
+    P: AsRef<Path>,
+{
+    Ok(&path.as_ref().canonicalize()? == path.as_ref())
+}
+
+///
+#[inline]
 pub fn modified<P>(source: P) -> std::io::Result<std::time::SystemTime>
 where
     P: AsRef<Path>,
 {
     std::fs::metadata(source)?.modified()
-}
-
-///
-#[inline]
-pub fn find<P>(root: P) -> impl Iterator<Item = CsyncResult<PathBuf>>
-where
-    P: AsRef<Path>,
-{
-    WalkDir::new(root).follow_links(true).into_iter().map(|entry| {
-        entry
-            .map(walkdir::DirEntry::into_path)
-            .map_err(|err| CsyncErr::Other(format!("{}", err)))
-    })
-}
-
-///
-#[inline]
-pub fn ls<P>(root: P) -> std::io::Result<impl Iterator<Item = std::io::Result<PathBuf>>>
-where
-    P: AsRef<Path>,
-{
-    Ok(std::fs::read_dir(root)?.map(|entry_res| entry_res.map(|entry| entry.path())))
 }
 
 /// Open a file with a write permission, creating the file if it does not already exist.

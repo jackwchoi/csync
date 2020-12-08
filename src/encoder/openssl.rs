@@ -381,7 +381,7 @@ mod tests {
                             let key_hash = sha512!(&b"zdpVea3Rm0qEEetZpNAbCKisdhObuzal".to_vec().into());
                             let iv_opt = Some(sha512!(&b"Va78UT3Bpy51cTeuAvWSX3d9Gon88YJd".to_vec().into()));
 
-                            find("./src")
+                            ind("./src")
                                 .par_bridge()
                                 .map(Result::unwrap)
                                 .filter(|path_buf| path_buf.as_path().is_file())

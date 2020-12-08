@@ -78,8 +78,26 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                 spread_depth_opt,
                 verbose,
             } => {
-                debug_assert!(source.exists());
-                debug_assert!(out_dir.exists());
+                if !source.exists() {
+                    csync_err!(SourceDoesNotExist, source.clone())?;
+                }
+                match out_dir.exists() {
+                    true => match out_dir.is_dir() {
+                        true => match std::fs::read_dir(out_dir).map(Iterator::count) {
+                            Ok(0) => (),
+                            _ => csync_err!(IncrementalEncryptionDisabledForNow)?,
+                        },
+                        false => csync_err!(OutdirIsNotDir, out_dir.to_path_buf())?,
+                    },
+                    false => (),
+                };
+                debug_assert!(match out_dir.exists() {
+                    true => match out_dir.is_dir() {
+                        true => std::fs::read_dir(out_dir)?.count() == 0,
+                        false => false,
+                    },
+                    false => true,
+                });
 
                 let key_deriv_spec = match kd_spec_ext.clone() {
                     KeyDerivSpecExt::Pbkdf2 {
@@ -97,12 +115,13 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                             };
                         }
                         match (num_iter_opt, time_opt) {
-                            (Some(num_iter), _) => pbkdf2_spec!(num_iter),
+                            (Some(num_iter), None) => pbkdf2_spec!(num_iter),
                             (None, time_opt) => {
                                 let time = time_opt.unwrap_or(DEFAULT_TIME_TO_HASH);
                                 let alg = unwrap_or_default(alg_opt);
                                 pbkdf2_spec!(determine_pbkdf2_num_iter(alg.ring(), time))
                             }
+                            _ => csync_err!(HashSpecConflict)?,
                         }
                     }
                     KeyDerivSpecExt::Scrypt {
@@ -123,7 +142,7 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                                 r_opt.unwrap_or(DEFAULT_SCRYPT_R),
                                 p_opt.unwrap_or(DEFAULT_SCRYPT_P),
                             ),
-                            _ => todo!(),
+                            _ => csync_err!(HashSpecConflict)?,
                         };
                         KeyDerivSpec::Scrypt {
                             log_n,
@@ -148,7 +167,7 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                 })
             }
             SyncerSpecExt::Decrypt { .. } | SyncerSpecExt::Clean { .. } => {
-                panic!("`spec_ext_to_int` should only be used for `SyncerSpecExt::Encrypt { .. }`")
+                panic!("`SyncerSpecExt` -> `SyncerSpec` should only be used for encrypting")
             }
         }
     }

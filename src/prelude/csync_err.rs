@@ -18,6 +18,7 @@ pub enum CsyncErr {
     AuthenticationFail,                    // checksum verification failed for this file
     DecryptionOutdirIsNonempty(PathBuf),   // when decrypting, outdir must be empty
     HashSpecConflict,                      //
+    IncrementalEncryptionDisabledForNow,   //
     InvalidSpreadDepth(usize),             // spread depth is outside of the allowed range
     MetadataLoadFailed(String),            // couldn't load this metadata file
     NonFatalReportFailed,                  //
@@ -41,7 +42,8 @@ impl CsyncErr {
             AuthenticationFail => 32,
             DecryptionOutdirIsNonempty(_) => 33,
             HashSpecConflict => 34,
-            InvalidSpreadDepth(_) => 35,
+            IncrementalEncryptionDisabledForNow => 35,
+            InvalidSpreadDepth(_) => 36,
             MetadataLoadFailed(_) => 37,
             NonFatalReportFailed => 38,
             Other(_) => 39,
@@ -72,6 +74,7 @@ impl Display for CsyncErr {
             DecryptionOutdirIsNonempty(pbuf) => w!("Cannot decrypt to `--out={:?}` because it is not empty.", pbuf),
             HashSpecConflict => w!("Cannot specify the strength of the hash with params AND time."),
             InvalidSpreadDepth(depth) => w!("Spread depth `--spread={}` is not in the allowed range (0, 255]", depth),
+            IncrementalEncryptionDisabledForNow => w!("Incremental Encryption is disabled for now"),
             MetadataLoadFailed(message) => w!("Could not load metadata file, password is prbs wrong: {}", message),
             NonFatalReportFailed => w!("Failed to report; is not fatal"),
             Other(desc) => w!("{}", desc),
@@ -139,6 +142,7 @@ mod tests {
             AuthenticationFail,
             DecryptionOutdirIsNonempty(PathBuf::from("")),
             HashSpecConflict,
+            IncrementalEncryptionDisabledForNow,
             InvalidSpreadDepth(3),
             MetadataLoadFailed("".to_string()),
             NonFatalReportFailed,
@@ -158,6 +162,7 @@ mod tests {
                 AuthenticationFail => true,
                 DecryptionOutdirIsNonempty(_) => true,
                 HashSpecConflict => true,
+                IncrementalEncryptionDisabledForNow => true,
                 InvalidSpreadDepth(_) => true,
                 MetadataLoadFailed(_) => true,
                 NonFatalReportFailed => true,
