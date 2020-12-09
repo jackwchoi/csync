@@ -73,6 +73,25 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
             verbose,
             ..
         } = opts;
+        //
+        if !source.exists() {
+            csync_err!(SourceDoesNotExist, source.clone())?;
+        }
+        //
+        match out_dir.exists() {
+            true => match out_dir.is_dir() {
+                true => match std::fs::read_dir(out_dir).map(Iterator::count) {
+                    Ok(0) => (),
+                    Ok(_) => match decrypt {
+                        true => csync_err!(DecryptionOutdirIsNonempty, out_dir.to_path_buf())?,
+                        false => csync_err!(IncrementalEncryptionDisabledForNow)?,
+                    },
+                    Err(err) => Err(err)?,
+                },
+                false => csync_err!(OutdirIsNotDir, out_dir.to_path_buf())?,
+            },
+            false => (),
+        };
 
         Ok(match (clean, decrypt) {
             (true, _) => {

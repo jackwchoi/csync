@@ -167,6 +167,8 @@ macro_rules! check_encrypt {
         //
         let output = check_core!($exit_code_expected, $key_1, $key_2, $( $arg ),+);
 
+        let out_dir = $out_dir;
+
         // exit code of the process
         match output.status.code().unwrap() {
             // if no error, do more correctness checks
@@ -176,7 +178,7 @@ macro_rules! check_encrypt {
                     // count all files and dirs in `$source`; these are the ones that `csync` encrypts
                     let source_file_count = get_all_source($source).count();
                     // count only the files in `$out_dir`; everything else in there doesn't really care
-                    let cipher_file_count = get_all_outdir($out_dir).count();
+                    let cipher_file_count = get_all_outdir(&out_dir).count();
                     // check that the 2 are equal, meaning that the correct number have been synced
                     assert_eq!(source_file_count, cipher_file_count, "check_encrypt! count match fail");
 
@@ -199,7 +201,7 @@ macro_rules! check_encrypt {
                 // check the amount of data written to `$out_dir`
                 {
                     // sum up the number of bytes in each file in `$out_dir`
-                    let data_written: u64 = get_all_outdir($out_dir)
+                    let data_written: u64 = get_all_outdir(&out_dir)
                         .map(|pb| std::fs::metadata(&pb).unwrap().len())
                         .sum();
                     // check that it was reported correctly
@@ -208,7 +210,12 @@ macro_rules! check_encrypt {
                 }
             }
             // TODO do things like chekcing to make sure that the files didn't change and etc
-            _ => todo!(),
+            _ => {
+                match out_dir.exists() {
+                    true => panic!("failed encryption should not create outdir"),
+                    false => (),
+                }
+            },
         };
         output
     }}
@@ -236,6 +243,8 @@ macro_rules! check_decrypt {
         //
         let output = check_core!($exit_code_expected, $key_1, $key_2, $( $arg ),+);
 
+        let out_dir = $out_dir;
+
         //
         match output.status.code().unwrap() {
             0 => {
@@ -243,7 +252,7 @@ macro_rules! check_decrypt {
                 // `csync src/ -d -o out/`, it creates `out/src/`
                 //
                 // so `final_dest = $out/$(basename $src)` is the root of the decryption's result
-                let final_dest = $out_dir.join($original.file_name().unwrap());
+                let final_dest = out_dir.join($original.file_name().unwrap());
 
                 {
                     // check that correct number of files have been decrypted
@@ -256,7 +265,18 @@ macro_rules! check_decrypt {
                 assert_tree_eq(&final_dest, $original);
             }
             // TODO do things like chekcing to make sure that the files didn't change and etc
-            _ => todo!(),
+            _ => {
+                match out_dir.exists() {
+                    true => {
+                        assert!(out_dir.is_dir());
+                        match std::fs::read_dir(out_dir).map(Iterator::count) {
+                            Ok(0) => (),
+                            _ => panic!("failed decryption should not modify outdir"),
+                        }
+                    }
+                    false => (),
+                }
+            },
         };
         output
     }}
@@ -340,6 +360,59 @@ macro_rules! generate_suite {
 
 mod success {
     use super::*;
+
+    #[test]
+    fn encrypted_dir_basename_changed() {
+        let source = tmpdir!().unwrap();
+        let source = source.path();
+
+        // pass
+        let exit_code = 0;
+
+        //
+        let tmpd = tmpdir!().unwrap();
+
+        //
+        let out_dir = tmpd.path().join("auVj2ZazQDC0ZNvgAp7WyhIfR0PSTyJS");
+        std::fs::create_dir(&out_dir).unwrap();
+        //
+        let renamed_out_dir = tmpd.path().join("jhlqRjoF7Iy3xA8TKtCpxiCr6YdH2cMC");
+
+        //
+        let out_out_dir = tmpdir!().unwrap();
+        let out_out_dir = out_out_dir.path();
+
+        // same keys, so it shouldn't fail from mismatch
+        let key_1 = "NbhfRifWQdHyUHPTrK0joRJ7u1NvsGL1";
+        let key_2 = key_1;
+
+        // encryption checks
+        check_encrypt!(
+            exit_code,
+            &source,
+            &out_dir,
+            key_1,
+            key_2,
+            path_as_str!(&source),
+            &format!("-o {}", path_as_str!(&out_dir)),
+            "-v"
+        );
+
+        std::fs::rename(&out_dir, &renamed_out_dir).unwrap();
+
+        // decryption checks
+        check_decrypt!(
+            exit_code,
+            &renamed_out_dir,
+            &out_out_dir,
+            &source,
+            key_1,
+            key_2,
+            path_as_str!(&renamed_out_dir),
+            &format!("-o {} -d", path_as_str!(&out_out_dir)),
+            "-v"
+        );
+    }
 
     //
     macro_rules! generate_success_body {
@@ -586,35 +659,95 @@ mod fail {
         assert!(dir_is_empty(out_dir.path()));
     }
 
-    #[test]
-    fn source_does_not_exist() {
-        //
-        let exit_code = CsyncErr::SourceDoesNotExist(PathBuf::from("")).exit_code();
+    mod source_does_not_exist {
+        use super::*;
 
-        // same keys
-        let key_1 = "wy2SuiVU1JadEM0H4G2vGHpVg1ePJFf6";
-        let key_2 = key_1;
+        #[test]
+        fn encryption_source_does_not_exist() {
+            //
+            let exit_code = CsyncErr::SourceDoesNotExist(PathBuf::from("")).exit_code();
 
-        //
-        let tmpd = tmpdir!().unwrap();
-        let source = tmpd.path().join("aW7aK7lBgW4gZWoH3Y4LCcIn2xAgEm2d");
-        assert!(!source.exists());
+            // same keys
+            let key_1 = "wy2SuiVU1JadEM0H4G2vGHpVg1ePJFf6";
+            let key_2 = key_1;
 
-        //
-        let out_dir = tmpdir!().unwrap();
+            //
+            let tmpd = tmpdir!().unwrap();
+            let source = tmpd.path().join("aW7aK7lBgW4gZWoH3Y4LCcIn2xAgEm2d");
+            assert!(!source.exists());
 
-        // encryption checks
-        check_core!(
-            exit_code,
-            key_1,
-            key_2,
-            path_as_str!(&source),
-            &format!("-o {}", path_as_str!(out_dir.path())),
-            "-v"
-        );
+            //
+            let out_dir = tmpdir!().unwrap();
 
-        //
-        assert!(dir_is_empty(out_dir.path()));
+            // encryption checks
+            check_core!(
+                exit_code,
+                key_1,
+                key_2,
+                path_as_str!(&source),
+                &format!("-o {}", path_as_str!(out_dir.path())),
+                "-v"
+            );
+
+            //
+            assert!(dir_is_empty(out_dir.path()));
+        }
+
+        #[test]
+        fn decryption_source_does_not_exist() {
+            //
+            let encryption_exit_code = 0;
+            let decryption_exit_code = CsyncErr::SourceDoesNotExist(PathBuf::from("")).exit_code();
+
+            let source = tmpdir!().unwrap();
+            let source = source.path();
+
+            // shadow because we don't want move or drop
+            let out_dir = tmpdir!().unwrap();
+            let out_dir = out_dir.path();
+
+            // shadow because we don't want move or drop
+            let out_out_dir = tmpdir!().unwrap();
+            let out_out_dir = out_out_dir.path();
+
+            // same keys, so it shouldn't fail from mismatch
+            let key_1 = "lh7DsqnJtEllR407yN2Qp9MaWaTpkTO2";
+            let key_2 = key_1;
+
+            // encryption checks
+            check_encrypt!(
+                encryption_exit_code,
+                source,
+                out_dir,
+                key_1,
+                key_2,
+                path_as_str!(source),
+                &format!("-o {}", path_as_str!(out_dir)),
+                "-v"
+            );
+
+            let dne_out_dir = tmpdir!().unwrap();
+            let dne_out_dir = dne_out_dir.path().join("grEx4pLK5p6OnrAST9GaHfCTwsc3jHQ3");
+
+            //
+            assert!(!dne_out_dir.exists());
+
+            // decryption checks
+            check_decrypt!(
+                decryption_exit_code,
+                &dne_out_dir,
+                out_out_dir,
+                source,
+                key_1,
+                key_2,
+                path_as_str!(&dne_out_dir),
+                &format!("-o {} -d", path_as_str!(out_out_dir)),
+                "-v"
+            );
+
+            //
+            assert!(dir_is_empty(&out_out_dir));
+        }
     }
 
     #[test]

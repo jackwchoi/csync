@@ -78,27 +78,6 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                 spread_depth_opt,
                 verbose,
             } => {
-                if !source.exists() {
-                    csync_err!(SourceDoesNotExist, source.clone())?;
-                }
-                match out_dir.exists() {
-                    true => match out_dir.is_dir() {
-                        true => match std::fs::read_dir(out_dir).map(Iterator::count) {
-                            Ok(0) => (),
-                            _ => csync_err!(IncrementalEncryptionDisabledForNow)?,
-                        },
-                        false => csync_err!(OutdirIsNotDir, out_dir.to_path_buf())?,
-                    },
-                    false => (),
-                };
-                debug_assert!(match out_dir.exists() {
-                    true => match out_dir.is_dir() {
-                        true => std::fs::read_dir(out_dir)?.count() == 0,
-                        false => false,
-                    },
-                    false => true,
-                });
-
                 let key_deriv_spec = match kd_spec_ext.clone() {
                     KeyDerivSpecExt::Pbkdf2 {
                         alg_opt,

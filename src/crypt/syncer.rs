@@ -112,48 +112,43 @@ impl Syncer {
                     true => csync_err!(SourceEqOutdir, $source.to_path_buf())?,
                     //
                     false => {
-                        match Syncer::load_syncer_action_spec($metadata_par_dir) {
+                        let (syncer_spec, action_spec) = Syncer::load_syncer_action_spec($metadata_par_dir)?;
+                        // let hashed_key = Syncer::verify_syncer_spec(&syncer_spec, &action_spec, &init_key)?;
+                        match spec_ext {
                             //
-                            Ok((syncer_spec, action_spec)) => {
-                                let hashed_key = Syncer::verify_syncer_spec(&syncer_spec, &action_spec, &init_key)?;
-                                match spec_ext {
-                                    //
-                                    SyncerSpecExt::Encrypt { .. } => Syncer::with_spec(syncer_spec, init_key.clone()),
-                                    //
-                                    SyncerSpecExt::Decrypt { .. } => match syncer_spec {
-                                        //
-                                        SyncerSpec::Encrypt {
+                            SyncerSpecExt::Encrypt { .. } => Syncer::with_spec(syncer_spec, init_key.clone()),
+                            //
+                            SyncerSpecExt::Decrypt { .. } => match syncer_spec {
+                                //
+                                SyncerSpec::Encrypt {
+                                    authenticator_spec,
+                                    cipher_spec,
+                                    compressor_spec,
+                                    key_deriv_spec,
+                                    init_salt,
+                                    spread_depth,
+                                    verbose,
+                                    ..
+                                } => {
+                                    create_dir_all($out_dir)?;
+                                    Syncer::with_spec(
+                                        SyncerSpec::Decrypt {
                                             authenticator_spec,
                                             cipher_spec,
                                             compressor_spec,
                                             key_deriv_spec,
+                                            out_dir: $out_dir.canonicalize()?,
+                                            source: $source.canonicalize()?,
                                             init_salt,
                                             spread_depth,
                                             verbose,
-                                            ..
-                                        } => {
-                                            create_dir_all($out_dir)?;
-                                            Syncer::with_spec(
-                                                SyncerSpec::Decrypt {
-                                                    authenticator_spec,
-                                                    cipher_spec,
-                                                    compressor_spec,
-                                                    key_deriv_spec,
-                                                    out_dir: $out_dir.canonicalize()?,
-                                                    source: $source.canonicalize()?,
-                                                    init_salt,
-                                                    spread_depth,
-                                                    verbose,
-                                                },
-                                                init_key.clone(),
-                                            )
-                                        }
-                                        _ => todo!(),
-                                    },
-                                    _ => todo!(),
+                                        },
+                                        init_key.clone(),
+                                    )
                                 }
-                            }
-                            Err(err) => csync_err!(MetadataLoadFailed, err.to_string()),
+                                _ => todo!(),
+                            },
+                            _ => todo!(),
                         }
                     }
                 }
@@ -262,24 +257,29 @@ impl Syncer {
 
     /// Load metadata from an existing `csync` directory.
     fn load_syncer_action_spec(source: &Path) -> CsyncResult<(SyncerSpec, ActionSpec)> {
-        let result_opt = WalkDir::new(source)
-            .follow_links(true)
-            .into_iter()
-            .filter_map(|entry| match entry.map(walkdir::DirEntry::into_path) {
-                Ok(pbuf) => match pbuf.extension().map(OsStr::to_str) {
-                    Some(Some("csync")) => match load_syncer_action_specs(&pbuf) {
-                        Ok(specs) => Some(specs),
+        match source.exists() {
+            true => {
+                let result_opt = WalkDir::new(source)
+                    .follow_links(true)
+                    .into_iter()
+                    .filter_map(|entry| match entry.map(walkdir::DirEntry::into_path) {
+                        Ok(pbuf) => match pbuf.extension().map(OsStr::to_str) {
+                            Some(Some("csync")) => match crate::crypt::util::load_syncer_action_specs(&pbuf) {
+                                Ok(specs) => Some(specs),
+                                _ => None,
+                            },
+                            _ => None,
+                        },
                         _ => None,
-                    },
-                    _ => None,
-                },
-                _ => None,
-            })
-            .nth(0);
+                    })
+                    .nth(0);
 
-        match result_opt {
-            Some(specs) => Ok(specs),
-            None => csync_err!(MetadataLoadFailed, "Could not open any of the csync files".to_string()),
+                match result_opt {
+                    Some(specs) => Ok(specs),
+                    None => csync_err!(MetadataLoadFailed, "Could not open any of the csync files".to_string()),
+                }
+            }
+            false => csync_err!(ControlFlow),
         }
     }
 

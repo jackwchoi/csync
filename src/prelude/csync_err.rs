@@ -16,6 +16,7 @@ pub type CsyncResult<T> = Result<T, CsyncErr>;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CsyncErr {
     AuthenticationFail,                    // checksum verification failed for this file
+    ControlFlow,                           //
     DecryptionOutdirIsNonempty(PathBuf),   // when decrypting, outdir must be empty
     HashSpecConflict,                      //
     IncrementalEncryptionDisabledForNow,   //
@@ -40,20 +41,21 @@ impl CsyncErr {
     pub fn exit_code(&self) -> i32 {
         match self {
             AuthenticationFail => 32,
-            DecryptionOutdirIsNonempty(_) => 33,
-            HashSpecConflict => 34,
-            IncrementalEncryptionDisabledForNow => 35,
-            InvalidSpreadDepth(_) => 36,
-            MetadataLoadFailed(_) => 37,
-            NonFatalReportFailed => 38,
-            Other(_) => 39,
-            OutdirIsNotDir(_) => 40,
-            PasswordConfirmationFail => 41,
-            PathContainsInvalidUtf8Bytes(_) => 42,
-            SerdeFailed => 43,
-            SourceDoesNotExist(_) => 44,
-            SourceDoesNotHaveFilename(_) => 45,
-            SourceEqOutdir(_) => 46,
+            ControlFlow => 33,
+            DecryptionOutdirIsNonempty(_) => 34,
+            HashSpecConflict => 35,
+            IncrementalEncryptionDisabledForNow => 36,
+            InvalidSpreadDepth(_) => 37,
+            MetadataLoadFailed(_) => 38,
+            NonFatalReportFailed => 39,
+            Other(_) => 40,
+            OutdirIsNotDir(_) => 41,
+            PasswordConfirmationFail => 42,
+            PathContainsInvalidUtf8Bytes(_) => 43,
+            SerdeFailed => 44,
+            SourceDoesNotExist(_) => 45,
+            SourceDoesNotHaveFilename(_) => 46,
+            SourceEqOutdir(_) => 47,
         }
     }
 }
@@ -71,6 +73,7 @@ impl Display for CsyncErr {
         //
         match self {
             AuthenticationFail => w!("Authentication failed."),
+            ControlFlow => w!("Control flow"),
             DecryptionOutdirIsNonempty(pbuf) => w!("Cannot decrypt to `--out={:?}` because it is not empty.", pbuf),
             HashSpecConflict => w!("Cannot specify the strength of the hash with params AND time."),
             InvalidSpreadDepth(depth) => w!("Spread depth `--spread={}` is not in the allowed range (0, 255]", depth),
@@ -140,6 +143,7 @@ mod tests {
     fn exit_codes_are_unique() {
         let variants = vec![
             AuthenticationFail,
+            ControlFlow,
             DecryptionOutdirIsNonempty(PathBuf::from("")),
             HashSpecConflict,
             IncrementalEncryptionDisabledForNow,
@@ -160,6 +164,7 @@ mod tests {
             .par_iter()
             .filter(|v| match v {
                 AuthenticationFail => true,
+                ControlFlow => true,
                 DecryptionOutdirIsNonempty(_) => true,
                 HashSpecConflict => true,
                 IncrementalEncryptionDisabledForNow => true,
