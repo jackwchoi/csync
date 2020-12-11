@@ -304,7 +304,15 @@ macro_rules! generate_suite {
         $fn_gen!(nested_dir_printable_bytes_with_fslash, (PathBuf::from("src/"), None));
 
         // nested directories of files with nonprintable content
-        $fn_gen!(nested_dir_nonprintable_bytes, (PathBuf::from(".git/objects/00/"), None));
+        $fn_gen!(
+            nested_dir_nonprintable_bytes_0,
+            (PathBuf::from(".git/objects/00/"), None)
+        );
+        // nested directories of files with nonprintable content
+        $fn_gen!(
+            nested_dir_nonprintable_bytes_1,
+            (PathBuf::from(".git/objects/pack/"), None)
+        );
 
         // nested directories of files with nonprintable content; more complex
         //

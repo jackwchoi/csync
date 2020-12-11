@@ -84,19 +84,25 @@ fn main() {
 }
 
 ///
-fn get_password() -> CsyncResult<CryptoSecureBytes> {
+fn get_password(confirm: bool) -> CsyncResult<CryptoSecureBytes> {
     //
     let get = |disp| match rpassword::prompt_password_stderr(disp) {
         Ok(pw) => Ok(sha512!(&pw.into())),
         Err(err) => csync_err!(Other, format!("Problem reading the password: {}", err)),
     };
     let initial = get("Enter your password: ")?;
-    let confirm = get("Confirm your password: ")?;
 
-    // constant time comparison
-    match initial == confirm {
-        true => Ok(initial),
-        false => csync_err!(PasswordConfirmationFail),
+    match confirm {
+        true => {
+            let confirm = get("Confirm your password: ")?;
+
+            // constant time comparison
+            match initial == confirm {
+                true => Ok(initial),
+                false => csync_err!(PasswordConfirmationFail),
+            }
+        }
+        false => Ok(initial)
     }
 }
 
@@ -183,7 +189,8 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
     let external_spec = SyncerSpecExt::try_from(opts)?;
 
     // the key that the user entered
-    let init_key = get_password()?;
+    let confirm_password = !opts.decrypt && !opts.clean;
+    let init_key = get_password(confirm_password)?;
 
     // TODO do an initial scan to get file count and size count to get an approxdmate duration?
 
