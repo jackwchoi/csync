@@ -165,9 +165,12 @@ macro_rules! check_encrypt {
         $( $arg:expr ),+
     ) => {{
         //
-        let output = check_core!($exit_code_expected, $key_1, $key_2, $( $arg ),+);
-
         let out_dir = $out_dir;
+        // hash of the directory structure, te see if anything changes
+        let out_dir_hash_before = hash_tree(&out_dir);
+
+        //
+        let output = check_core!($exit_code_expected, $key_1, $key_2, $( $arg ),+);
 
         // exit code of the process
         match output.status.code().unwrap() {
@@ -211,6 +214,9 @@ macro_rules! check_encrypt {
             }
             // TODO do things like chekcing to make sure that the files didn't change and etc
             _ => {
+                // hash of the directory structure, te see if anything changes
+                let out_dir_hash_before = hash_tree(&out_dir);
+
                 match out_dir.exists() {
                     true => panic!("failed encryption should not create outdir"),
                     false => (),
@@ -241,9 +247,12 @@ macro_rules! check_decrypt {
         $( $arg:expr ),+
     ) => {{
         //
-        let output = check_core!($exit_code_expected, $key_1, $key_2, $( $arg ),+);
-
         let out_dir = $out_dir;
+        // hash of the directory structure, te see if anything changes
+        let out_dir_hash_before = hash_tree(&out_dir);
+
+        //
+        let output = check_core!($exit_code_expected, $key_1, $key_2, $( $arg ),+);
 
         //
         match output.status.code().unwrap() {
@@ -266,17 +275,9 @@ macro_rules! check_decrypt {
             }
             // TODO do things like chekcing to make sure that the files didn't change and etc
             _ => {
-                match out_dir.exists() {
-                    true => {
-                        assert!(out_dir.is_dir());
-                        match std::fs::read_dir(out_dir).map(Iterator::count) {
-                            Ok(0) => (),
-                            _ => panic!("failed decryption should not modify outdir"),
-                        }
-                    }
-                    false => (),
-                }
-            },
+                let out_dir_hash_after = hash_tree(&out_dir);
+                assert_eq!(out_dir_hash_before, out_dir_hash_after);
+            }
         };
         output
     }}
@@ -641,30 +642,57 @@ mod fail {
     }
 
     #[test]
-    fn password_confirmation_fail_during_decryption() {
+    fn authentication_fail() {
         //
-        let exit_code = CsyncErr::PasswordConfirmationFail.exit_code();
+        let encryption_exit_code = 0;
+        let decryption_exit_code = CsyncErr::AuthenticationFail.exit_code();
 
-        // two different keys
-        let key_1 = "ATE2FJvegViHOWl3HuM3sCBdWwsksXBN";
-        let key_2 = "jGuN8qoK4oOd2CglkukmgvuLYXGCHInB";
-
-        //
         let source = tmpdir!().unwrap();
+        let source = source.path();
+
+        // shadow because we don't want move or drop
         let out_dir = tmpdir!().unwrap();
+        let out_dir = out_dir.path();
+
+        // shadow because we don't want move or drop
+        let out_out_dir = tmpdir!().unwrap();
+        let out_out_dir = out_out_dir.path();
+
+        // same keys, so it shouldn't fail from mismatch
+        let key_1 = "JPSIXf4R4tQcOWe9U3paJTcKoUiEQmHm";
+        let key_2 = key_1;
 
         // encryption checks
-        check_core!(
-            exit_code,
+        check_encrypt!(
+            encryption_exit_code,
+            source,
+            out_dir,
             key_1,
             key_2,
-            path_as_str!(&source.path()),
-            &format!("-o {}", path_as_str!(out_dir.path())),
-            "-v -d"
+            path_as_str!(source),
+            &format!("-o {}", path_as_str!(out_dir)),
+            "-v"
+        );
+        
+        // different key from encryption
+        let key_1 = "G4hsElnQWIY7sUPNkmkI6pT0vosQVQPv";
+        let key_2 = key_1;
+
+        // decryption checks
+        check_decrypt!(
+            decryption_exit_code,
+            &out_dir,
+            out_out_dir,
+            source,
+            key_1,
+            key_2,
+            path_as_str!(&out_dir),
+            &format!("-o {} -d", path_as_str!(out_out_dir)),
+            "-v"
         );
 
         //
-        assert!(dir_is_empty(out_dir.path()));
+        assert!(dir_is_empty(&out_out_dir));
     }
 
     mod source_does_not_exist {
@@ -820,7 +848,6 @@ mod fail {
     SourceDoesNotHaveFilename(PathBuf),    //
     SourceEqOutdir(PathBuf),               //
 
-    authentication_fail
     metadata_load_failed
     non_fatal_report_failed
     other

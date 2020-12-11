@@ -3,7 +3,7 @@ use crate::{
     prelude::*,
     primitives::*,
     secure_vec::*,
-    specs::{authenticator_spec::*, cipher_spec::*, compressor_spec::*, key_deriv_spec::*, key_deriv_spec_ext::*},
+    specs::{authenticator_spec::*, cipher_spec::*, compressor_spec::*, key_deriv_spec_ext::*},
 };
 use std::{fmt::Debug, path::PathBuf};
 
@@ -40,11 +40,7 @@ impl SyncerSpecExt {
     fn check_rep(&self) {
         match self {
             SyncerSpecExt::Encrypt { .. } => {}
-            SyncerSpecExt::Decrypt {
-                source,
-                out_dir,
-                verbose,
-            } => {
+            SyncerSpecExt::Decrypt { source, .. } => {
                 debug_assert!(source.exists());
             }
             SyncerSpecExt::Clean { source, verbose } => {

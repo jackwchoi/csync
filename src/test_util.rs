@@ -22,55 +22,61 @@ where
     })
 }
 
-pub fn hash_tree<P>(path: P) -> CsyncResult<CryptoSecureBytes>
+/// None if path does not exist
+pub fn hash_tree<P>(path: P) -> CsyncResult<Option<CryptoSecureBytes>>
 where
     P: AsRef<Path>,
 {
-    let key_hash = sha512!(&b"SgG5U89uTcXiXqYA82H0zcCMbrmZw3wgfPJXeTROAEwzebmG9x268iGS8nuYWJLN"
-        .to_vec()
-        .into());
+    match path.as_ref().exists() {
+        true => {
+            let key_hash = sha512!(&b"SgG5U89uTcXiXqYA82H0zcCMbrmZw3wgfPJXeTROAEwzebmG9x268iGS8nuYWJLN"
+                .to_vec()
+                .into());
 
-    let mut ctx = {
-        let hmac_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA512, key_hash.0.unsecure());
-        ring::hmac::Context::with_key(&hmac_key)
-    };
+            let mut ctx = {
+                let hmac_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA512, key_hash.0.unsecure());
+                ring::hmac::Context::with_key(&hmac_key)
+            };
 
-    let fail = walkdir::WalkDir::new(&path)
-        .sort_by(|a, b| a.file_name().cmp(b.file_name()))
-        .into_iter()
-        .map(|entry_res| -> CsyncResult<bool> {
-            let entry = entry_res?;
-            let file = fopen_r(entry.path())?;
+            let fail = walkdir::WalkDir::new(&path)
+                .sort_by(|a, b| a.file_name().cmp(b.file_name()))
+                .into_iter()
+                .map(|entry_res| -> CsyncResult<bool> {
+                    let entry = entry_res?;
+                    let file = fopen_r(entry.path())?;
 
-            let rel_path = subpath_par(entry.path(), &path).unwrap();
-            let entry_path_as_str = match rel_path.to_str() {
-                Some(as_str) => Ok(as_str),
-                None => csync_err!(PathContainsInvalidUtf8Bytes, entry.path().to_path_buf()),
-            }?;
+                    let rel_path = subpath_par(entry.path(), &path).unwrap();
+                    let entry_path_as_str = match rel_path.to_str() {
+                        Some(as_str) => Ok(as_str),
+                        None => csync_err!(PathContainsInvalidUtf8Bytes, entry.path().to_path_buf()),
+                    }?;
 
-            // feed filename
-            ctx.update(entry_path_as_str.as_bytes());
-            // feed file permision bits
-            let perm_bits_as_u32 = perm_bits(&entry.path())?;
-            let perm_bits_as_u8s = u32_to_u8s(perm_bits_as_u32);
-            ctx.update(&perm_bits_as_u8s);
+                    // feed filename
+                    ctx.update(entry_path_as_str.as_bytes());
+                    // feed file permision bits
+                    let perm_bits_as_u32 = perm_bits(&entry.path())?;
+                    let perm_bits_as_u8s = u32_to_u8s(perm_bits_as_u32);
+                    ctx.update(&perm_bits_as_u8s);
 
-            let mut buf_reader = std::io::BufReader::new(file);
-            let mut buffer = [0u8; DEFAULT_BUFFER_SIZE];
+                    let mut buf_reader = std::io::BufReader::new(file);
+                    let mut buffer = [0u8; DEFAULT_BUFFER_SIZE];
 
-            loop {
-                match buf_reader.read(&mut buffer) {
-                    Ok(0) => break Ok(true),
-                    Ok(bytes_read) => ctx.update(&buffer[..bytes_read]),
-                    Err(_) => break Ok(false),
-                }
+                    loop {
+                        match buf_reader.read(&mut buffer) {
+                            Ok(0) => break Ok(true),
+                            Ok(bytes_read) => ctx.update(&buffer[..bytes_read]),
+                            Err(_) => break Ok(false),
+                        }
+                    }
+                })
+                .any(|res| res.is_err());
+
+            match fail {
+                true => csync_err!(Other, "hashing failed".to_string()),
+                false => Ok(Some(CryptoSecureBytes(ctx.clone().sign().as_ref().to_vec().into()))),
             }
-        })
-        .any(|res| res.is_err());
-
-    match fail {
-        true => csync_err!(Other, "hashing failed".to_string()),
-        false => Ok(CryptoSecureBytes(ctx.clone().sign().as_ref().to_vec().into())),
+        }
+        false => Ok(None),
     }
 }
 
