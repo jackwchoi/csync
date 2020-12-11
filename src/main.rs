@@ -102,7 +102,7 @@ fn get_password(confirm: bool) -> CsyncResult<CryptoSecureBytes> {
                 false => csync_err!(PasswordConfirmationFail),
             }
         }
-        false => Ok(initial)
+        false => Ok(initial),
     }
 }
 

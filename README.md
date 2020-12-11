@@ -186,15 +186,9 @@ out/
 cargo install csync
 ```
 
+# TODO's
 
-
-
-
-
-
-https://github.com/fdehau/tui-rs
-
-
-
-
-better reporting of files that were not able to be synced
+1. https://github.com/fdehau/tui-rs
+1. better reporting of files that were not able to be synced
+1. default to timing hashes
+1. unify wrong password errors

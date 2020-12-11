@@ -3,7 +3,7 @@ use crate::{
     prelude::*,
     primitives::*,
     secure_vec::*,
-    specs::{authenticator_spec::*, cipher_spec::*, compressor_spec::*, key_deriv_spec::*},
+    specs::{authenticator_spec::*, cipher_spec::*, compressor_spec::*, key_deriv_spec::*, key_deriv_spec_ext::*},
 };
 use std::{fmt::Debug, path::PathBuf};
 
