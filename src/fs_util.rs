@@ -2,10 +2,9 @@ use crate::prelude::*;
 use std::{
     fs::File,
     os::unix::fs::{OpenOptionsExt, PermissionsExt},
-    path::{Path, PathBuf},
+    path::Path,
 };
 use tempfile::{self, NamedTempFile, TempDir};
-use walkdir::WalkDir;
 
 ///
 pub fn remove<P>(path: P) -> std::io::Result<()>
@@ -22,6 +21,7 @@ where
 }
 
 ///
+#[allow(unused_macros)]
 macro_rules! tmpfile {
     () => {
         crate::fs_util::mktemp_file(None, "", "")
@@ -43,10 +43,10 @@ macro_rules! tmpdir {
         crate::fs_util::mktemp_dir(None, "", "")
     };
     ( $out_dir:expr ) => {
-        tmpfile!($out_dir, "", "")
+        tmpdir!($out_dir, "", "")
     };
     ( $out_dir:expr, $prefix:expr ) => {
-        tmpfile!($out_dir, $prefix, "")
+        tmpdir!($out_dir, $prefix, "")
     };
     ( $out_dir:expr, $prefix:expr, $suffix:expr ) => {
         crate::fs_util::mktemp_dir(Some($out_dir), $prefix, $suffix)
@@ -55,6 +55,7 @@ macro_rules! tmpdir {
 
 ///
 #[inline]
+#[allow(dead_code)]
 pub fn mktemp_file(out_dir: Option<&Path>, prefix: &str, suffix: &str) -> std::io::Result<NamedTempFile> {
     tempfile::Builder::new()
         .prefix(prefix)
@@ -89,15 +90,6 @@ where
     Ok(&path.as_ref().canonicalize()? == path.as_ref())
 }
 
-///
-#[inline]
-pub fn modified<P>(source: P) -> std::io::Result<std::time::SystemTime>
-where
-    P: AsRef<Path>,
-{
-    std::fs::metadata(source)?.modified()
-}
-
 /// Open a file with a write permission, creating the file if it does not already exist.
 ///
 /// 1. if the file already exists, the existing content will be truncated
@@ -128,13 +120,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::*;
     use colmac::*;
-    use rayon::iter::ParallelBridge;
-    use rayon::prelude::*;
-    use std::collections::HashSet;
-    use std::{fs::Permissions, os::unix::fs::PermissionsExt};
-    use walkdir::DirEntry;
+    use rayon::{iter::ParallelBridge, prelude::*};
+    use std::{collections::HashSet, fs::Permissions, os::unix::fs::PermissionsExt, path::PathBuf};
+    use walkdir::{DirEntry, WalkDir};
 
     ///
     mod fopen_r {
@@ -265,7 +254,9 @@ mod tests {
             let tmpd_path = tmpd.path();
 
             let tmpf_path = tmpd_path.join("f");
-            let tmpf = fopen_w(&tmpf_path).unwrap();
+            {
+                fopen_w(&tmpf_path).unwrap();
+            }
 
             let result: HashSet<_> = walk(tmpd_path);
             let expected: HashSet<_> = vec![tmpd_path, &tmpf_path].into_iter().map(|p| p.to_path_buf()).collect();

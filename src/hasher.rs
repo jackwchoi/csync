@@ -104,10 +104,9 @@ pub fn pbkdf2_custom(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs_util::*;
     use rayon::prelude::*;
     use ring::pbkdf2::PBKDF2_HMAC_SHA512;
-    use std::{collections::HashSet, fs::File};
+    use std::collections::HashSet;
 
     ///
     fn keys<'a>() -> Vec<&'a str> {

@@ -96,29 +96,6 @@ impl<'de> de::Deserialize<'de> for SecureBytes {
     where
         D: Deserializer<'de>,
     {
-        enum Field {
-            Inner,
-        };
-
-        impl<'de> de::Deserialize<'de> for Field {
-            fn deserialize<D>(deserializer: D) -> Result<Field, D::Error>
-            where
-                D: Deserializer<'de>,
-            {
-                struct FieldVisitor;
-
-                impl<'de> Visitor<'de> for FieldVisitor {
-                    type Value = Field;
-
-                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                        formatter.write_str("todo")
-                    }
-                }
-
-                deserializer.deserialize_identifier(FieldVisitor)
-            }
-        }
-
         struct SecureVecVisitor;
 
         impl<'de> Visitor<'de> for SecureVecVisitor {

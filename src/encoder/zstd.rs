@@ -115,7 +115,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{encoder::zstd::*, test_util::*, util::*};
+    use crate::test_util::*;
     use rayon::{iter::ParallelBridge, prelude::*};
 
     ///
@@ -134,8 +134,8 @@ mod tests {
         test_data().into_par_iter().for_each(|input_bytes| {
             let compressed = ZstdEncoder::new(&input_bytes[..], None).unwrap().as_vec().unwrap();
 
-            let compressed_len = (compressed.len() as f64);
-            let input_len = (input_bytes.len() as f64);
+            let compressed_len = compressed.len() as f64;
+            let input_len = input_bytes.len() as f64;
             assert!(compressed_len < input_len * 0.9);
         });
     }

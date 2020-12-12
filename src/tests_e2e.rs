@@ -1,4 +1,3 @@
-use super::*;
 use crate::{fs_util::*, prelude::*, test_util::*, util::*};
 use itertools::Itertools;
 use std::path::Path;
@@ -215,7 +214,8 @@ macro_rules! check_encrypt {
             // TODO do things like chekcing to make sure that the files didn't change and etc
             _ => {
                 // hash of the directory structure, te see if anything changes
-                let out_dir_hash_before = hash_tree(&out_dir);
+                let out_dir_hash_after = hash_tree(&out_dir);
+                assert_eq!(out_dir_hash_before, out_dir_hash_after);
 
                 match out_dir.exists() {
                     true => panic!("failed encryption should not create outdir"),
@@ -557,59 +557,6 @@ mod success {
 }
 
 ////////////////////////////////////////////////////////////////
-
-macro_rules! generate_fail_body {
-    //
-    ( $fn_name:ident, $pbuf_and_tmpd:expr, $key:literal $(, $arg:literal )* ) => {
-        //
-        #[test]
-        fn $fn_name() {
-            let (source, _tmpd): (PathBuf, Option<TempDir>) = $pbuf_and_tmpd;
-            let source = &source;
-
-            // pass
-            let exit_code = 0;
-
-            // shadow because we don't want move or drop
-            let out_dir = tmpdir!().unwrap();
-            let out_dir = out_dir.path();
-
-            // shadow because we don't want move or drop
-            let out_out_dir = tmpdir!().unwrap();
-            let out_out_dir = out_out_dir.path();
-
-            // same keys, so it shouldn't fail from mismatch
-            let key_1 = "aoeu";
-            let key_2 = "aoeu";
-
-            // encryption checks
-            check_encrypt!(
-                exit_code,
-                source,
-                out_dir,
-                key_1,
-                key_2,
-                path_as_str!(source),
-                &format!("-o {}", path_as_str!(out_dir)),
-                "-v"
-                $(, $arg )*
-            );
-
-            // decryption checks
-            check_decrypt!(
-                exit_code,
-                out_dir,
-                out_out_dir,
-                source,
-                key_1,
-                key_2,
-                path_as_str!(out_dir),
-                &format!("-o {} -d", path_as_str!(out_out_dir)),
-                "-v"
-            );
-        }
-    }
-}
 
 mod fail {
     use super::*;
@@ -1013,7 +960,6 @@ mod fail {
 
     mod invalid_spread_depth {
         use super::*;
-        use crate::primitives::spread_depth::*;
 
         //
         macro_rules! testgen {
@@ -1075,7 +1021,7 @@ mod fail {
 
                     //
                     let source = tmpdir!().unwrap();
-                    let (out_dir, tmpd) = $outdir_and_tmpd;
+                    let (out_dir, _tmpd) = $outdir_and_tmpd;
 
                     // encryption checks
                     check_core!(

@@ -34,23 +34,6 @@ pub enum SyncerSpecExt {
 }
 
 ///
-impl SyncerSpecExt {
-    ///
-    #[inline]
-    fn check_rep(&self) {
-        match self {
-            SyncerSpecExt::Encrypt { .. } => {}
-            SyncerSpecExt::Decrypt { source, .. } => {
-                debug_assert!(source.exists());
-            }
-            SyncerSpecExt::Clean { source, verbose } => {
-                debug_assert!(source.exists());
-            }
-        }
-        todo!()
-    }
-}
-
 impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
     type Error = CsyncErr;
 

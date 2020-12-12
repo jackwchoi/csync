@@ -7,11 +7,6 @@ pub struct RehashSpec(KeyDerivSpec);
 
 impl RehashSpec {
     #[inline]
-    pub fn with_key_deriv_spec(key_deriv_spec: &KeyDerivSpec) -> Self {
-        Self(key_deriv_spec.clone())
-    }
-
-    #[inline]
     pub fn rehash(&self, key_hash: &DerivedKey) -> CsyncResult<RehashedKey> {
         self.0.derive(&key_hash.0 .0).map(|derived_key| RehashedKey(derived_key.0))
     }

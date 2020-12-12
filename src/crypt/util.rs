@@ -360,7 +360,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs_util::*;
     use crate::test_util::*;
 
     mod ser_deser {
@@ -450,7 +449,7 @@ mod tests {
                     let syncer_spec = rand_syncer_spec!(Encrypt, out_dir_path, source_path);
 
                     $files_iter_func()
-                        .take(NUM_FILE_SAMPLES)
+                        .take(32)
                         .par_bridge()
                         .for_each(|file_path| {
                             let arena = tmpdir!().unwrap();

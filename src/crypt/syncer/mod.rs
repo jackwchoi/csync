@@ -17,10 +17,10 @@ use rayon::prelude::*;
 use std::ffi::OsStr;
 use std::{
     convert::TryFrom,
-    fs::{create_dir_all, metadata, },
+    fs::{create_dir_all, metadata},
     io,
     os::unix::fs::PermissionsExt,
-    path::{Path},
+    path::Path,
 };
 use tempfile::TempDir;
 use walkdir::WalkDir;
@@ -311,23 +311,7 @@ impl Syncer {
         }
     }
 
-    // TODO maybe return the final dk here so that with_spec doesnt do the same work again
-    fn verify_syncer_spec(
-        syncer_spec: &SyncerSpec,
-        action_spec: &ActionSpec,
-        init_key: &InitialKey,
-    ) -> CsyncResult<DerivedKey> {
-        match syncer_spec {
-            SyncerSpec::Encrypt { key_deriv_spec, .. } | SyncerSpec::Decrypt { key_deriv_spec, .. } => {
-                let derived_key = key_deriv_spec.derive(&init_key.0 .0)?;
-                action_spec.verify_derived_key(&derived_key)?;
-                Ok(derived_key)
-            }
-            SyncerSpec::Clean { .. } => todo!(),
-        }
-    }
-
-    // 1. for the root cfile,
+    /// 1. for the root cfile,
     ///
     pub fn sync_enc<'a>(&'a self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>> + 'a> {
         match &self.spec {
@@ -451,7 +435,7 @@ impl Syncer {
                         },
                         Err(_) => true,
                     })
-                    .map(move |(uid, entry_res)| -> CsyncResult<Action> {
+                    .map(move |(_, entry_res)| -> CsyncResult<Action> {
                         let cipherpath = entry_res?.path().canonicalize()?;
                         debug_assert!(is_canonical(&cipherpath).unwrap());
                         let (path, file_type, _) =

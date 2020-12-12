@@ -16,7 +16,7 @@ use crate::{
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::{
-    fs::{ read_dir, Permissions},
+    fs::{read_dir, Permissions},
     path::{Path, PathBuf},
     time::SystemTime,
 };
@@ -116,7 +116,7 @@ pub fn report_syncer_spec(spec: &SyncerSpec) {
                 }
             );
         }
-        SyncerSpec::Clean { source, verbose } if *verbose => todo!(),
+        SyncerSpec::Clean { verbose, .. } if *verbose => todo!(),
         _ => (),
     }
 }

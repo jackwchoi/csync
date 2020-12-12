@@ -57,7 +57,6 @@ debug = true
 debug-assertions = true
 overflow-checks = true
 lto = false
-panic = 'unwind'    # This setting is always ignored.
 incremental = true
 codegen-units = 256
 rpath = false

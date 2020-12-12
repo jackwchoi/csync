@@ -1,6 +1,5 @@
 pub use CsyncErr::*;
 
-use crate::primitives::*;
 use std::{
     fmt::{self, Display, Formatter},
     io,

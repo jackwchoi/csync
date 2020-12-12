@@ -262,12 +262,9 @@ where
 mod tests {
     use super::*;
     use crate::{fs_util::*, test_util::*};
-    use colmac::*;
     use itertools::Itertools;
     use rayon::prelude::*;
-    use std::collections::HashSet;
     use std::u8;
-    use walkdir::DirEntry;
 
     ///
     mod read_exact {

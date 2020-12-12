@@ -127,21 +127,7 @@ macro_rules! rng_seed {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::test_util::*;
     use std::collections::HashSet;
-
-    mod rand_u64 {
-        use super::*;
-    }
-
-    mod rng {
-        use super::*;
-    }
-
-    mod rng_seed {
-        use super::*;
-    }
 
     ///
     #[test]

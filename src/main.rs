@@ -22,6 +22,7 @@ mod specs;
 
 #[macro_use]
 mod encoder;
+#[allow(dead_code)] // because most functions in this mod are only used in tests
 mod test_util;
 
 mod clargs;
@@ -286,8 +287,6 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn os_is_unix() {
         assert!(cfg!(unix));

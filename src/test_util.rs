@@ -2,13 +2,11 @@ use crate::{fs_util::*, prelude::*, secure_vec::*, util::*};
 use rayon::prelude::*;
 use std::{
     collections::HashSet,
-    fs::{copy, create_dir_all, metadata},
-    io::{self, Read},
+    fs::{copy, create_dir_all},
+    io::Read,
     path::{Path, PathBuf},
 };
 use walkdir::WalkDir;
-
-pub const NUM_FILE_SAMPLES: usize = 16;
 
 ///
 pub fn find<P>(root: P) -> impl Iterator<Item = CsyncResult<PathBuf>>
@@ -274,8 +272,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use colmac::*;
-    use std::fs::File;
 
     ///
     #[inline]
@@ -460,6 +456,7 @@ mod tests {
             use super::*;
 
             ///
+            #[test]
             #[should_panic]
             fn one_dir_is_empty() {
                 sugar_assert!("src", tmpdir!().unwrap().path());
