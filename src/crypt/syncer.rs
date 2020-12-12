@@ -83,12 +83,19 @@ pub struct Syncer {
 
 ///
 impl Syncer {
+
+    /// # Returns
+    ///
+    /// The specificatino of this syncer.
     #[inline]
     pub fn get_spec(&self) -> SyncerSpec {
         self.spec.clone()
     }
 
-    /// The only public constructor.
+    /// # Parameters
+    ///
+    /// # Returns
+    ///
     pub fn new(spec_ext: &SyncerSpecExt, init_key: InitialKey) -> CsyncResult<Self> {
         //
         match spec_ext {
@@ -101,7 +108,7 @@ impl Syncer {
         }
     }
 
-    /// init from an existing csync dir by loading the metadata
+    // init from an existing csync dir by loading the metadata
     fn from_dir(spec_ext: &SyncerSpecExt, init_key: &InitialKey) -> CsyncResult<Self> {
         //
         macro_rules! from_dir {
@@ -185,7 +192,7 @@ impl Syncer {
         }
     }
 
-    /// # Parameters
+    // # Parameters
     fn with_spec_ext(spec_ext: &SyncerSpecExt, init_key: InitialKey) -> CsyncResult<Self> {
         // if from_dir works, use it
         // if not, start fresh from
@@ -225,7 +232,7 @@ impl Syncer {
         }
     }
 
-    ///
+    //
     fn with_spec(spec: SyncerSpec, init_key: InitialKey, derived_key_opt: Option<DerivedKey>) -> CsyncResult<Self> {
         report_syncer_spec(&spec);
         match &spec {
@@ -284,7 +291,7 @@ impl Syncer {
         }
     }
 
-    /// Load metadata from an existing `csync` directory.
+    // Load metadata from an existing `csync` directory.
     fn load_syncer_action_spec(source: &Path) -> CsyncResult<(SyncerSpec, ActionSpec)> {
         match source.exists() {
             true => {
@@ -471,7 +478,7 @@ impl Syncer {
         }
     }
 
-    /// Miscellaneous checks.
+    // Miscellaneous checks.
     #[inline]
     fn check_rep(&self) {}
 }
@@ -575,9 +582,9 @@ fn report_syncer_spec(spec: &SyncerSpec) {
     }
 }
 
-/// Mapping from paths under `root` to some of its metadata.
-///
-///
+// Mapping from paths under `root` to some of its metadata.
+//
+//
 fn meta_map(root: &Path) -> impl ParallelIterator<Item = CsyncResult<(usize, PathBuf, Permissions, SystemTime, FileType)>> {
     debug_assert!(is_canonical(&root).unwrap());
     WalkDir::new(root)
@@ -618,7 +625,7 @@ fn meta_map(root: &Path) -> impl ParallelIterator<Item = CsyncResult<(usize, Pat
         })
 }
 
-///
+//
 fn check_out_dir(out_dir: &Path, spec: &SyncerSpec) -> CsyncResult<()> {
     // `out_dir` doesn't have to exist, but requires case-by-case checks
     match out_dir.exists() {
@@ -646,11 +653,11 @@ fn check_out_dir(out_dir: &Path, spec: &SyncerSpec) -> CsyncResult<()> {
     }
 }
 
-/// # Parameters
-///
-/// 1. `spread_depth`: number of layers used in spreading; a max of `64 ^ spread_depth` number of
-///    distinct directories can be created
-/// 2. `path`: the path with which spread dirs will be created
+// # Parameters
+//
+// 1. `spread_depth`: number of layers used in spreading; a max of `64 ^ spread_depth` number of
+//    distinct directories can be created
+// 2. `path`: the path with which spread dirs will be created
 fn path_to_spread(spread_depth: SpreadDepth, init_salt: &CryptoSecureBytes, path: &Path) -> CsyncResult<PathBuf> {
     debug_assert!(is_canonical(&path).unwrap());
 
@@ -669,9 +676,9 @@ fn path_to_spread(spread_depth: SpreadDepth, init_salt: &CryptoSecureBytes, path
     }
 }
 
-/// # Parameters
-///
-/// 1.
+// # Parameters
+//
+// 1.
 #[inline]
 fn spread_to_hash(spread: &Path) -> CsyncResult<CryptoSecureBytes> {
     // get a hash of the chars in the spread dir path, to use as the initialization
@@ -682,17 +689,17 @@ fn spread_to_hash(spread: &Path) -> CsyncResult<CryptoSecureBytes> {
     }
 }
 
-/// # Parameters
-///
-/// 1. `src_root`:
-/// 1. `src_path`:
-/// 1. `file_type`:
-/// 1. `spread_hash`:
-/// 1. `derived_key`:
-///
-/// # Returns
-///
-/// a
+// # Parameters
+//
+// 1. `src_root`:
+// 1. `src_path`:
+// 1. `file_type`:
+// 1. `spread_hash`:
+// 1. `derived_key`:
+//
+// # Returns
+//
+// a
 fn path_to_cipherpath(
     src_root: &Path,
     src_path: &Path,
@@ -760,7 +767,7 @@ fn path_to_cipherpath(
     Ok(PathBuf::from(format!("{}.{}", without_ext, FILE_SUFFIX)))
 }
 
-///
+//
 fn cipherpath_to_path(
     spread_depth: SpreadDepth,
     src_root: &Path,
