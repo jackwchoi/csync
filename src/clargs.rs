@@ -56,7 +56,7 @@ pub struct Opts {
     /// The csync directory to be created. If a directory exists under this path, a csync directory
     /// will be created with a basename identical name as the source directory. If a directory does
     /// not exist under this path, one will be created.
-    #[structopt(short = "o", long = "out", parse(from_os_str))]
+    #[structopt(short = "o", long = "outdir", parse(from_os_str))]
     pub out_dir: PathBuf,
 
     /// supported options are `hmac-sha512`
