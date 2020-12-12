@@ -36,7 +36,7 @@ Key-derivation algorithm:           Scrypt (log_n: 21, r: 8, p: 1, 4096-bit outp
 Project home page: `https://github.com/jackwchoi/csync`
 
 USAGE:
-    csync [FLAGS] [OPTIONS] <source> --out <out_dir>
+    csync [FLAGS] [OPTIONS] <source> --outdir <out_dir>
 
 FLAGS:
         --clean      Clean the csync directory, making it as compact as possible and TODO: TRUNCATING
@@ -55,19 +55,19 @@ OPTIONS:
         --compressor <compressor_opt>
             The compression algorithm to use; supported algorithms are: `zstd`
 
-    -o, --out <out_dir>
+    -o, --outdir <out_dir>
             The csync directory to be created. If a directory exists under this path, a csync directory will be created
             with a basename identical name as the source directory. If a directory does not exist under this path, one
             will be created.
         --pbkdf2-algorithm <pbkdf2_alg_opt>            supported options are `hmac-sha512`
-    -n, --pbkdf2-num-iter <pbkdf2_num_iter_opt>        
-        --pbkdf2-time <pbkdf2_time_to_hash_opt>        
+    -n, --pbkdf2-num-iter <pbkdf2_num_iter_opt>
+        --pbkdf2-time <pbkdf2_time_to_hash_opt>
         --salt-len <salt_len_opt>                      Salt length in bytes.
-        --scrypt-log-n <scrypt_log_n_opt>              
-        --scrypt-output-len <scrypt_output_len_opt>    
-        --scrypt-p <scrypt_p_opt>                      
-        --scrypt-r <scrypt_r_opt>                      
-        --scrypt-time <scrypt_time_to_hash_opt>        
+        --scrypt-log-n <scrypt_log_n_opt>
+        --scrypt-output-len <scrypt_output_len_opt>
+        --scrypt-p <scrypt_p_opt>
+        --scrypt-r <scrypt_r_opt>
+        --scrypt-time <scrypt_time_to_hash_opt>
     -s, --spread-depth <spread_depth_opt>              TODO
 
 ARGS:
@@ -171,66 +171,85 @@ Then the following properties of `csync` holds:
 
 For example running `csync` on the following `src/` directory would result in something like
 
-```
-src/
-├── clargs.rs
-├── crypt/
-│  ├── crypt_syncer.rs
-│  └── mod.rs
-├── encoder/
-│  ├── aes_cryptor.rs
-│  ├── crypt_encoder.rs
-│  ├── hash_encoder.rs
-│  ├── identity_encoder.rs
+```bash
+$ tree src/crypt
+src/crypt/
+├── action.rs
+├── mod.rs
+├── syncer/
 │  ├── mod.rs
-│  ├── text_decoder.rs
-│  ├── text_encoder.rs
-│  ├── zstd_decoder.rs
-│  └── zstd_encoder.rs
-├── hasher.rs
-├── main.rs
+│  └── util.rs
 └── util.rs
 ```
 
-```
+```bash
+$ csync 'src/crypt/' --outdir 'out/' --verbose
+Enter your password:
+Confirm your password:
+
+Encrypting: "$ROOT/src/crypt" -> "$ROOT/out"
+
+                     Random salt:                  (4096-bit)
+                    Spread depth:                  (3)
+        Authentication algorithm:      HMAC-SHA512 (_)
+           Compression algorithm:        Zstandard (level-3)
+            Encryption algorithm:         ChaCha20 (4096-bit salt)
+        Key-derivation algorithm:           Scrypt (log_n: 20, r: 8, p: 1, 4096-bit output, 4096-bit salt)
+
+Generating a derived key... took 2.991910668s
+
+Using 8 threads...
+  7.000  files |  57.933 KB ->  47.574 KB in 29.097ms =   1.991 MB/s...
+                   Files synced:   7.000  files
+                      Data read:  57.933 KB
+                    Data stored:  47.574 KB
+                     Throughput:   1.988 MB/sec
+                       Duration: 29.145ms
+
+$ tree out/
 out/
-├── 4/
-│  └── 7/
-│     └── CVLPKOrPtv_tMFTa0bt54swatTfnRyL0m6OdI77fNfSgr18UzF_mOh7fZbepuXCM/
-│        └── QlV3naQGWJSAofUeW-dFv54G9OVVv1gsYNe6sKYwOKPWxOmqwQPljGR25e-pxaIt/
-│           └── ua17cggPxRUywYtTVvaJtivYSh7bX25toYp9CXduCLUo5TNJ3qj2sz3QTqnyNv8G/
-│              └── NzIqlATaJuI0ElYyG1x5arCLBWmuEzrEpS75pun7p83Xq1VlyHcfNthff2AvJEzX/
-│                 └── b85lYFfHIJdbendj5dzLXy8tTM5ivoxsLTlsbAZVv5fqLirP7iHVlAHVPfYdxcZB
-├── 7/
-│  └── I/
-│     └── Ha3zK28wA3RRoQzFkOW8r0DkpICXZoocW-MApH-GmmIVnXxFsfUcWDJGtSJa4E1E/
-│        └── hciPMVoO4IFh52J74dXbyo3gcSEAQQOqohtT5xh5CF0dK3gdX2lkPEME8mHWq1Rw/
-│           └── QHlKdS0p6gOfGE5hJxzYnkYDX0ZLoYIX4bCcQxU6msDB6WGO32YLtyu30z_NraXa/
-│              └── QTbGInrkoGOpwwlNdol2kTX5lwFsxbMQ7uD2onRDRITNWN4msEOdv4WOqBgT-XaO/
-│                 └── Sl1upgeZewCRyU0a1971738LKi9w
-├── C/
-│  └── X/
-│     └── x_Q3lOvABfyRJRZ5yOzF_PZrrab9KZE_0rHiJJUgLHe1s9dD0UMARSJUEi6dlvmJ/
-│        └── fVH8WmxJhHWlAGqPNkiR_6Icg_6I0TMsVG6ZCLlboiK_-vFaFBzenFTVXCGPWxWc/
-│           └── dzGShApKwM7emFBrQFT33Qd1-IeB9TWfq23lDHN0WkRJ3veifewS0r0U6R2W7hAi/
-│              └── LNhBEKUr1IYWun0_SSyjbZnUCju4gfiyyfeoptrvy7eOy4Gz4tLlU8cjSWMjRXXX/
-│                 └── DGXUPoB3FyxbPIVespVCph_nEPcvHg==
-├── e/
-│  ├── a/
-│  │  └── 7NzmocsGVNxUVvq2ZPG7nEDXNps1UdalEyss_rIMzrRmUG1rwvVvq3DC-0unsdCR/
-│  │     └── CNcQPVNHaCEpCMvNVTnoPVSM5PEPawJpY4NV0582foI7OIj1qo-cmXQQ1srdSRDk/
-│  │        └── XnXcXiepWg0iZ6VjKkhLWVduRSqi32x54vW7oHdFsX6hjfQx-QdiLOXQXz5BwawI/
-│  │           └── S25S6ixWSPWfD_FwPAYwN4CvoCXMXAX2957huTdfc7QF4D2eg6q16_hfBZ53JJSl/
-│  │              └── 5PPazc0aSThmo_LtN3Ge7gYcNAw=
-│  └── U/
-│     └── kDj7DarqREw_RN0wDg7ngzUqgOqzBMutoH-naT1pB04oOzQmtE80OD9XuN8BFPbD/
-│        └── ntr3PA==
+├── 1/
+│  └── l/
+│     └── q/
+│        └── q0kgbcgyzyss5n32cakciklf4y4zmw1m0msin1gwudstxz5q3pb51hfnavk2f4lf/
+│           └── 35enr2c5ramae___.csync
+├── 3/
+│  └── j/
+│     └── 0/
+│        └── arx1yybo3rsjr1tvjj4epms3ew3rao0utb415nzh5q15csl005uslg0aypebd1v3/
+│           └── glxmfiu3bfozi___.csync
 ├── h/
 │  └── d/
-│     └── 6rLKJD8kln4-VJFJevlAU7PxDutmQOPO_42mZBjILSRXCeKZND23QK3eK0kJId0C/
-│        └── FNJxZkKP3EOqZ4qxjfGAjQ-LrVBS2XDHWA==
-├── metadata.json.enc
-└── ...
+│     └── q/
+│        └── ocazg1kbjnmymsmejhzaybz0w3sd1huybsdqpdu35km4stt31w3q1razzt4uc20a/
+│           └── ix3ymwjsvjxrft3b5vnridhvdrzylbv1r4dsadgehyt51jp5gp2ilmzeyghknwiu/
+│              └── hde45o5fb5t51fkyjkimjmihyzjnxit45lfbypuumzolzbisveia____.csync
+├── k/
+│  └── o/
+│     └── k/
+│        └── b5qiyt1skidya1kbo1lo0amyrmnnodn5ntqfp4wzhgffmjdmyjerf2hd52izhnpo/
+│           └── r5wh024ds1xlk5ddldzg5bwwszp5xkbkzzkjkmcr0vne21n3igisdomow2dxdzhv/
+│              └── epbdpp4xy2obs0iq2s2p3fx1hg2k54c1f44y0xumzmzk2l33jxya____.csync
+├── l/
+│  └── d/
+│     └── u/
+│        └── 1fy30pvd0kvr0sjbjodxyvoyqkcbv3ov2szwnrtvadgveb0v300yzmandcehnv3k/
+│           └── mrrby0udldiuibtuzgg1qcptblvz3v1lsvqohf2lxuw5xllj4gqptsogq2u0rm2v/
+│              └── inocfehgezzvlketfc3vigusw2gegibe341yjrjqxykaf1xjj3xqaazc3iwa0rfi/
+│                 └── whr55mcznbnkzc3ifo0reqeggposgzlxmu5cnwy_.csync
+├── s/
+│  └── m/
+│     └── s/
+│        └── k5mboo02fy1xogzxnkpw4v1mgkxjdoqfr3q302uulompd5zjalg15avniaed2brk/
+│           └── by0ihjaqx4yn4zubyuthf020c5e55fvt0olkzppt0ekx3qug15m31vikv2vgv4vz/
+│              └── ix14xujwu2qofnu1se3dc5yfsq______.csync
+└── t/
+   └── q/
+      └── b/
+         └── 14apjbznabrnjimoxiaoe3doijihcrrxzufs05zpo5hqjxpbpsos0kmyvlc3e4t1/
+            └── bu4knwmniunoffq33qabdopgtlpppszkdcs2vqjftdacnfcrqjijventetsyed5g/
+               └── idtoaegcirgbmpxgdaadxuapq2pxjgbzhq4b0g2aodlkcg1tne2yizp4jer2iws0/
+                  └── wcjistel210vu___.csync
 ```
 
 ## Installing
