@@ -8,7 +8,7 @@ use crate::{
 };
 use std::{
     fmt::Debug,
-    fs::{create_dir_all, metadata, rename, File, Permissions},
+    fs::{metadata, rename, File, Permissions},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
@@ -67,7 +67,7 @@ impl Action {
     /// 1. `arena`: some directory such that  `Action`
     pub fn manifest(self, arena: &Path, key_hash: &DerivedKey) -> CsyncResult<Self> {
         let action_arena = arena.join(format!("{}", thread_id::get()));
-        create_dir_all(&action_arena)?;
+        create_dir_all_if_nexists(&action_arena)?;
 
         match &self.syncer_spec {
             SyncerSpec::Encrypt { .. } => self.encrypt(&action_arena, key_hash),
@@ -106,7 +106,7 @@ impl Action {
 
         // eqivalent to `mkdir --parents "$(dirname $dest)"`
         match self.dest.parent() {
-            Some(parent) => create_dir_all(parent)?,
+            Some(parent) => create_dir_all_if_nexists(parent)?,
             None => (),
         };
 
@@ -131,12 +131,12 @@ impl Action {
         )?;
 
         match self.dest.parent() {
-            Some(parent) => create_dir_all(parent)?,
+            Some(parent) => create_dir_all_if_nexists(parent)?,
             None => (),
         };
         match self.file_type {
             FileType::File => (),
-            FileType::Dir => create_dir_all(&tmp_dest)?,
+            FileType::Dir => create_dir_all_if_nexists(&tmp_dest)?,
         };
 
         // set permission bits of `tmp_dest`
@@ -150,5 +150,15 @@ impl Action {
             Err(_) if self.file_type == FileType::Dir && self.dest.is_dir() => Ok(self),
             Err(err) => Err(err)?,
         }
+    }
+}
+
+fn create_dir_all_if_nexists<P>(path: P) -> std::io::Result<()>
+where
+    P: AsRef<Path>,
+{
+    match path.as_ref().exists() {
+        true => Ok(()),
+        false => std::fs::create_dir_all(&path),
     }
 }

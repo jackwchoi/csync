@@ -15,13 +15,7 @@ use crate::{
 };
 use rayon::prelude::*;
 use std::ffi::OsStr;
-use std::{
-    convert::TryFrom,
-    fs::{create_dir_all, metadata},
-    io,
-    os::unix::fs::PermissionsExt,
-    path::Path,
-};
+use std::{convert::TryFrom, io, os::unix::fs::PermissionsExt, path::Path};
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
@@ -153,7 +147,7 @@ impl Syncer {
                                     verbose,
                                     ..
                                 } => {
-                                    create_dir_all($out_dir)?;
+                                    std::fs::create_dir_all($out_dir)?;
                                     Syncer::with_spec(
                                         SyncerSpec::Decrypt {
                                             authenticator_spec,
@@ -217,7 +211,7 @@ impl Syncer {
                         (true, false) => csync_err!(OutdirIsNotDir, out_dir.to_path_buf())?,
                     }
 
-                    create_dir_all(out_dir)?;
+                    std::fs::create_dir_all(out_dir)?;
                     let spec = SyncerSpec::try_from(spec_ext)?;
                     Syncer::with_spec(spec, init_key, None)
                 }
@@ -255,7 +249,7 @@ impl Syncer {
                 debug_assert!(is_canonical(out_dir).unwrap());
 
                 // do this here because canonicalization requires the path to exist
-                // create_dir_all(&out_dir)?;
+                // std::fs::create_dir_all(&out_dir)?;
                 check_out_dir(&out_dir, &spec)?;
 
                 let source = source.canonicalize()?.to_path_buf();
@@ -375,7 +369,7 @@ impl Syncer {
                             };
                         };
 
-                        match metadata(&cipherpath) {
+                        match std::fs::metadata(&cipherpath) {
                             Ok(meta) => match meta.modified() {
                                 // both files exist, so compare their modified times
                                 Ok(enc_mod) => match src_modtime.duration_since(enc_mod) {
