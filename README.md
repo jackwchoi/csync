@@ -171,7 +171,7 @@ Then the following properties of `csync` holds:
 
 For example running `csync` on the following `src/` directory would result in something like
 
-```bash
+```txt
 $ tree src/crypt
 src/crypt/
 ├── action.rs
@@ -182,7 +182,7 @@ src/crypt/
 └── util.rs
 ```
 
-```bash
+```txt
 $ csync 'src/crypt/' --outdir 'out/' --verbose
 Enter your password:
 Confirm your password:
