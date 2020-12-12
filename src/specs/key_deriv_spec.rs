@@ -3,14 +3,6 @@ use ring::pbkdf2;
 use scrypt::ScryptParams;
 use serde::{Deserialize, Serialize};
 
-/// Parameters for `scrypt`.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ScryptLogN(pub u8);
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ScryptR(pub u32);
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ScryptP(pub u32);
-
 // # Parameters
 //
 // 1. `$time_to_hash`:
@@ -47,7 +39,7 @@ macro_rules! determine_params {
 // `time_to_hash` and `2 * time_to_hash` number of seconds on this machine, approximately.
 fn determine_scrypt_params(time_to_hash: u16) -> CsyncResult<(ScryptLogN, ScryptR, ScryptP)> {
     //
-    const LOG_N: u8 = DEFAULT_SCRYPT_LOG_N - 5;
+    const LOG_N: u8 = DEFAULT_SCRYPT_LOG_N - 4;
     const R: u32 = DEFAULT_SCRYPT_R;
     const P: u32 = DEFAULT_SCRYPT_P;
     let scrypt_params = ScryptParams::new(LOG_N, R, P)?;
@@ -58,8 +50,9 @@ fn determine_scrypt_params(time_to_hash: u16) -> CsyncResult<(ScryptLogN, Scrypt
         |average_time_nanos: f64| {
             let target_as_nanos = time_to_hash as f64 * 1e9;
             let factor = match (target_as_nanos / average_time_nanos).log2().ceil() {
+                // shouldn't really happen
                 f if f > std::u8::MAX as f64 => panic!(),
-                f if LOG_N as f64 <= f => 1u8,
+                //
                 f => f as u8,
             };
 

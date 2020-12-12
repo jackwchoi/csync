@@ -97,7 +97,7 @@ impl Syncer {
             //
             SyncerSpecExt::Decrypt { .. } => Syncer::from_dir(spec_ext, &init_key),
             //
-            SyncerSpecExt::Clean { .. } => todo!(),
+            SyncerSpecExt::Clean { .. } => todo!(), // probably should use from_dir
         }
     }
 
@@ -113,6 +113,13 @@ impl Syncer {
                     //
                     false => {
                         let (syncer_spec, action_spec) = Syncer::load_syncer_action_spec($metadata_par_dir)?;
+
+                        // TODO check that pw is correct
+                        todo!(); 
+                        // need to check that init_key is correct
+                        // this is time consuming, and if it succeeds then it should be used in
+                        // with_spec
+
                         // let hashed_key = Syncer::verify_syncer_spec(&syncer_spec, &action_spec, &init_key)?;
                         match spec_ext {
                             //
@@ -167,6 +174,8 @@ impl Syncer {
 
     /// # Parameters
     fn with_spec_ext(spec_ext: &SyncerSpecExt, init_key: InitialKey) -> CsyncResult<Self> {
+        // if from_dir works, use it
+        // if not, start fresh from
         match Syncer::from_dir(spec_ext, &init_key) {
             Ok(syncer) => match spec_ext {
                 SyncerSpecExt::Encrypt { verbose, .. } | SyncerSpecExt::Decrypt { verbose, .. } => {
@@ -185,6 +194,8 @@ impl Syncer {
                     verbose,
                     ..
                 } => {
+                    todo!(); // check that we don't accidentally overwrite different directories
+                             // check that it's a fresh dir?
                     create_dir_all(out_dir)?;
                     let spec = SyncerSpec::try_from(spec_ext)?;
                     Syncer::with_spec(spec, init_key)

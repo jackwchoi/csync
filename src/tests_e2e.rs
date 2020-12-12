@@ -673,7 +673,7 @@ mod fail {
             &format!("-o {}", path_as_str!(out_dir)),
             "-v"
         );
-        
+
         // different key from encryption
         let key_1 = "G4hsElnQWIY7sUPNkmkI6pT0vosQVQPv";
         let key_2 = key_1;
