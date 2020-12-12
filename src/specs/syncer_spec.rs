@@ -1,20 +1,13 @@
 use crate::{
-    encoder::{hmac::*, identity::*, openssl::*, zstd::*},
-    fs_util::*,
     prelude::*,
     primitives::*,
     secure_vec::*,
     specs::{authenticator_spec::*, cipher_spec::*, compressor_spec::*, key_deriv_spec::*, syncer_spec_ext::*},
-    util::*,
 };
-use ring::{hmac, pbkdf2};
-use scrypt::ScryptParams;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{ Deserialize, Serialize};
 use std::{
     fmt::Debug,
-    fs::File,
-    io::{Read, Write},
-    path::{Path, PathBuf},
+    path::{ PathBuf},
 };
 
 ///

@@ -114,16 +114,28 @@ impl Syncer {
                     false => {
                         let (syncer_spec, action_spec) = Syncer::load_syncer_action_spec($metadata_par_dir)?;
 
-                        // TODO check that pw is correct
-                        todo!(); 
-                        // need to check that init_key is correct
-                        // this is time consuming, and if it succeeds then it should be used in
-                        // with_spec
+                        let derived_key = match &syncer_spec {
+                            SyncerSpec::Encrypt {
+                                key_deriv_spec,
+                                verbose,
+                                ..
+                            } => {
+                                let (derived_key, _) = time!(
+                                    *verbose,
+                                    "Generating/authenticating the derived key",
+                                    key_deriv_spec.derive(&init_key.0 .0)?
+                                );
+                                derived_key
+                            }
+                            _ => panic!("Loaded metadata should only be of the variant `SyncerSpec::Encrypt`"),
+                        };
+
+                        action_spec.verify_derived_key(&derived_key)?;
 
                         // let hashed_key = Syncer::verify_syncer_spec(&syncer_spec, &action_spec, &init_key)?;
                         match spec_ext {
                             //
-                            SyncerSpecExt::Encrypt { .. } => Syncer::with_spec(syncer_spec, init_key.clone()),
+                            SyncerSpecExt::Encrypt { .. } => Syncer::with_spec(syncer_spec, init_key.clone(), None),
                             //
                             SyncerSpecExt::Decrypt { .. } => match syncer_spec {
                                 //
@@ -151,6 +163,7 @@ impl Syncer {
                                             verbose,
                                         },
                                         init_key.clone(),
+                                        None,
                                     )
                                 }
                                 _ => todo!(),
@@ -189,16 +202,23 @@ impl Syncer {
             },
             Err(_) => match spec_ext {
                 SyncerSpecExt::Encrypt {
-                    source,
                     out_dir,
-                    verbose,
                     ..
                 } => {
-                    todo!(); // check that we don't accidentally overwrite different directories
-                             // check that it's a fresh dir?
+                    // if from_dir failed, outdir must either be empty or non-existent
+                    match (out_dir.exists(), out_dir.is_dir()) {
+                        (false, _) => (),
+                        (true, true) => match std::fs::read_dir(out_dir).map(Iterator::count) {
+                            Ok(0) => (),
+                            Ok(_) => csync_err!(IncrementalEncryptionDisabledForNow)?,
+                            Err(_) => panic!("Failed to read `out_dir`"),
+                        },
+                        (true, false) => csync_err!(OutdirIsNotDir, out_dir.to_path_buf())?,
+                    }
+
                     create_dir_all(out_dir)?;
                     let spec = SyncerSpec::try_from(spec_ext)?;
-                    Syncer::with_spec(spec, init_key)
+                    Syncer::with_spec(spec, init_key, None)
                 }
                 SyncerSpecExt::Decrypt { .. } | SyncerSpecExt::Clean { .. } => todo!(),
             },
@@ -206,12 +226,7 @@ impl Syncer {
     }
 
     ///
-    fn with_spec_and_derived_key(spec: SyncerSpec, derived_key: DerivedKey) -> CsyncResult<Self> {
-        todo!()
-    }
-
-    ///
-    fn with_spec(spec: SyncerSpec, init_key: InitialKey) -> CsyncResult<Self> {
+    fn with_spec(spec: SyncerSpec, init_key: InitialKey, derived_key_opt: Option<DerivedKey>) -> CsyncResult<Self> {
         report_syncer_spec(&spec);
         match &spec {
             //
@@ -252,8 +267,11 @@ impl Syncer {
                     Some(_) if source == out_dir => csync_err!(SourceEqOutdir, source),
                     //
                     _ => {
-                        let (derived_key, _) =
-                            time!(*verbose, "Generating a derived key", key_deriv_spec.derive(&init_key.0 .0)?);
+                        let derived_key = match derived_key_opt {
+                            Some(derived_key) => derived_key,
+                            None => time!(*verbose, "Generating a derived key", key_deriv_spec.derive(&init_key.0 .0)?).0,
+                        };
+
                         Ok(Self {
                             arena: tmpdir!()?,
                             init_key,
@@ -726,7 +744,7 @@ fn path_to_cipherpath(
     let aug_src_rel_path_bytes = aug_src_rel_path_string.as_bytes();
     let ciphertext = compose_encoders!(
         aug_src_rel_path_bytes,
-        Aes256CbcEnc => (&CryptoSecureBytes(derived_key.0.0.clone()), Some(&spread_hash)),
+        Aes256CbcEnc => (&CryptoSecureBytes(derived_key.0 .0.clone()), Some(&spread_hash)),
         TextEncoder => &BASE32PATH
     )?
     .as_string()?;
@@ -784,7 +802,7 @@ fn cipherpath_to_path(
     let decrypted = compose_encoders!(
         &cipher_bytes[..],
         TextDecoder => &BASE32PATH,
-        Aes256CbcDec => (&CryptoSecureBytes(derived_key.0.0.clone()), Some(&spread_hash))
+        Aes256CbcDec => (&CryptoSecureBytes(derived_key.0 .0.clone()), Some(&spread_hash))
     )?
     .as_string()?;
 
