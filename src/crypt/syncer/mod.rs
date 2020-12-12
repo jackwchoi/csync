@@ -137,7 +137,9 @@ impl Syncer {
                         // let hashed_key = Syncer::verify_syncer_spec(&syncer_spec, &action_spec, &init_key)?;
                         match spec_ext {
                             //
-                            SyncerSpecExt::Encrypt { .. } => Syncer::with_spec(syncer_spec, init_key.clone(), None),
+                            SyncerSpecExt::Encrypt { .. } => {
+                                Syncer::with_spec(syncer_spec, init_key.clone(), Some(derived_key))
+                            }
                             //
                             SyncerSpecExt::Decrypt { .. } => match syncer_spec {
                                 //
@@ -165,7 +167,7 @@ impl Syncer {
                                             verbose,
                                         },
                                         init_key.clone(),
-                                        None,
+                                        Some(derived_key),
                                     )
                                 }
                                 _ => todo!(),

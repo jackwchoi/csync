@@ -191,3 +191,4 @@ cargo install csync
 1. https://github.com/fdehau/tui-rs
 1. better reporting of files that were not able to be synced
 1. better interface for checking `out_dir`
+1. handle symlinks

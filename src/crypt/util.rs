@@ -448,38 +448,35 @@ mod tests {
                     let action_spec = rand_action_spec();
                     let syncer_spec = rand_syncer_spec!(Encrypt, out_dir_path, source_path);
 
-                    $files_iter_func()
-                        .take(32)
-                        .par_bridge()
-                        .for_each(|file_path| {
-                            let arena = tmpdir!().unwrap();
+                    $files_iter_func().take(32).par_bridge().for_each(|file_path| {
+                        let arena = tmpdir!().unwrap();
 
-                            let key_hash = {
-                                let key_deriv_spec: KeyDerivSpec = Default::default();
-                                key_deriv_spec
-                                    .derive(
-                                        &b"bnd51yibKcrXj8XKgf3bmlYJzEhhM15E6RU7WnykUead1geM9CXYnGFEndx5vqiH"
-                                            .to_vec()
-                                            .into(),
-                                    )
-                                    .unwrap()
-                            };
+                        let key_hash = {
+                            let key_deriv_spec: KeyDerivSpec = Default::default();
+                            key_deriv_spec
+                                .derive(
+                                    &b"bnd51yibKcrXj8XKgf3bmlYJzEhhM15E6RU7WnykUead1geM9CXYnGFEndx5vqiH"
+                                        .to_vec()
+                                        .into(),
+                                )
+                                .unwrap()
+                        };
 
-                            let mut enc_dest: Vec<u8> = vec![];
-                            csync_encrypt(
-                                &syncer_spec,
-                                &action_spec,
-                                arena.path(),
-                                fopen_r(&file_path).unwrap(),
-                                &mut enc_dest,
-                                &key_hash,
-                            )
-                            .unwrap();
+                        let mut enc_dest: Vec<u8> = vec![];
+                        csync_encrypt(
+                            &syncer_spec,
+                            &action_spec,
+                            arena.path(),
+                            fopen_r(&file_path).unwrap(),
+                            &mut enc_dest,
+                            &key_hash,
+                        )
+                        .unwrap();
 
-                            let mut dec_dest: Vec<u8> = vec![];
-                            csync_decrypt(&enc_dest[..], Some(&mut dec_dest), &key_hash).unwrap();
-                            assert_eq!(&dec_dest[..], &std::fs::read(&file_path).unwrap()[..]);
-                        });
+                        let mut dec_dest: Vec<u8> = vec![];
+                        csync_decrypt(&enc_dest[..], Some(&mut dec_dest), &key_hash).unwrap();
+                        assert_eq!(&dec_dest[..], &std::fs::read(&file_path).unwrap()[..]);
+                    });
                 }
             };
         }
