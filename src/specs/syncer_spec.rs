@@ -4,11 +4,8 @@ use crate::{
     secure_vec::*,
     specs::{authenticator_spec::*, cipher_spec::*, compressor_spec::*, key_deriv_spec::*, syncer_spec_ext::*},
 };
-use serde::{ Deserialize, Serialize};
-use std::{
-    fmt::Debug,
-    path::{ PathBuf},
-};
+use serde::{Deserialize, Serialize};
+use std::{fmt::Debug, path::PathBuf};
 
 ///
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
