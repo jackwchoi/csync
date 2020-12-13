@@ -882,7 +882,7 @@ mod fail {
 
     mod command_line_argument_conflict {
         use super::*;
-        
+
         //
         macro_rules! testgen {
             //

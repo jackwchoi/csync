@@ -75,7 +75,7 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                 })
             }
             SyncerSpecExt::Decrypt { .. } | SyncerSpecExt::Clean { .. } => {
-                panic!("`SyncerSpecExt` -> `SyncerSpec` should only be used for encrypting")
+                panic!("`SyncerSpecExt` -> `SyncerSpec` conversion should only be used for encrypting")
             }
         }
     }

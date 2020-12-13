@@ -19,38 +19,39 @@ use structopt::StructOpt;
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "csync")]
 pub struct Opts {
-    /// The authentication algorithm to use; supported algorithms are: `hmac-sha512`
+    /// Use this authentication algorithm; supported algorithms are: `hmac-sha512`.
+    /// Defaults to `hmac-sha512`.
     #[structopt(long = "auth")]
     pub auth_opt: Option<String>,
 
-    /// The encryption algorithm to use; supported algorithms are: `aes256cbc`
+    /// Use this encryption algorithm; supported algorithms are: `aes256cbc` and `chacha20`.
+    /// Defaults to `chacha20`.
     #[structopt(long = "cipher")]
     pub cipher_opt: Option<String>,
 
-    /// Clean the csync directory, making it as compact as possible and TODO: TRUNCATING
+    /// Clean the provided `csync` directory, making it as compact as possible.
     #[structopt(long = "clean")]
     pub clean: bool,
 
-    /// Salt length in bytes.
+    /// Use salts that are this many bytes long.
     #[structopt(long = "salt-len")]
     pub salt_len_opt: Option<u16>,
 
-    /*
-    #[structopt(long = "num_threads")]
-    pub num_threads: bool,
-    */
-
+    /// Use this many threads; defaults to the number of cores available on the machine.
+    #[structopt(short = "t", long = "num-threads")]
+    pub num_threads: Option<usize>,
 
     /*
     /// Clean the csync directory, making it as compact as possible.
     #[structopt(short="C",long = "no-color")]
     pub no_color: bool,
     */
-    /// The compression algorithm to use; supported algorithms are: `zstd`
+    /// Use this compression algorithm to use; supported algorithms are: `zstd`.
+    /// Defaults to `zstd`.
     #[structopt(long = "compressor")]
     pub compressor_opt: Option<String>,
 
-    /// Decrypt an existing csync directory.
+    /// Decrypt the provided `csync` directory.
     #[structopt(short = "d", long = "decrypt")]
     pub decrypt: bool,
 
@@ -62,25 +63,34 @@ pub struct Opts {
     /// The csync directory to be created. If a directory exists under this path, a csync directory
     /// will be created with a basename identical name as the source directory. If a directory does
     /// not exist under this path, one will be created.
+    /// TODO make this default for --clean
     #[structopt(short = "o", long = "outdir", parse(from_os_str))]
     pub out_dir: PathBuf,
 
-    /// supported options are `hmac-sha512`
+    /// Use this algorithm within `pbkdf2`; supported options are `hmac-sha512`.
+    /// Defaults to `hmac-sha512`.
     #[structopt(long = "pbkdf2-algorithm")]
     pub pbkdf2_alg_opt: Option<String>,
-    #[structopt(short = "n", long = "pbkdf2-num-iter")]
+    ///
+    #[structopt(long = "pbkdf2-num-iter")]
     pub pbkdf2_num_iter_opt: Option<u32>,
+    ///
     #[structopt(long = "pbkdf2-time")]
     pub pbkdf2_time_to_hash_opt: Option<u16>,
 
+    ///
     #[structopt(long = "scrypt-time")]
     pub scrypt_time_to_hash_opt: Option<u16>,
+    /// Use this as the `log_2(n)` parameter for `scrypt`.
     #[structopt(long = "scrypt-log-n")]
     pub scrypt_log_n_opt: Option<u8>,
+    /// Use this as the `r` parameter for `scrypt`.
     #[structopt(long = "scrypt-r")]
     pub scrypt_r_opt: Option<u32>,
+    /// Use this as the `p` parameter for `scrypt`.
     #[structopt(long = "scrypt-p")]
     pub scrypt_p_opt: Option<u32>,
+    ///
     #[structopt(long = "scrypt-output-len")]
     pub scrypt_output_len_opt: Option<usize>,
 

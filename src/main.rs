@@ -189,9 +189,12 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
     //
     let external_spec = SyncerSpecExt::try_from(opts)?;
 
-    // TODO configure num threads
-    // https://docs.rs/rayon/1.5.0/rayon/struct.ThreadPoolBuilder.html
-    // rayon::ThreadPoolBuilder::new().num_threads(22).build_global().unwrap();
+    if let Some(num_threads) = opts.num_threads {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build_global()
+            .unwrap();
+    }
 
     // the key that the user entered
     // TODO also, don't confirm if incremental build
