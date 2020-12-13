@@ -36,6 +36,12 @@ pub struct Opts {
     pub salt_len_opt: Option<u16>,
 
     /*
+    #[structopt(long = "num_threads")]
+    pub num_threads: bool,
+    */
+
+
+    /*
     /// Clean the csync directory, making it as compact as possible.
     #[structopt(short="C",long = "no-color")]
     pub no_color: bool,

@@ -15,6 +15,7 @@ pub type CsyncResult<T> = Result<T, CsyncErr>;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum CsyncErr {
     AuthenticationFail,                    // checksum verification failed for this file
+    CommandLineArgumentConflict(String),   //
     ControlFlow,                           //
     DecryptionOutdirIsNonempty(PathBuf),   // when decrypting, outdir must be empty
     HashSpecConflict,                      //
@@ -40,21 +41,22 @@ impl CsyncErr {
     pub fn exit_code(&self) -> i32 {
         match self {
             AuthenticationFail => 32,
-            ControlFlow => 33,
-            DecryptionOutdirIsNonempty(_) => 34,
-            HashSpecConflict => 35,
-            IncrementalEncryptionDisabledForNow => 36,
-            InvalidSpreadDepth(_) => 37,
-            MetadataLoadFailed(_) => 38,
-            NonFatalReportFailed => 39,
-            Other(_) => 40,
-            OutdirIsNotDir(_) => 41,
-            PasswordConfirmationFail => 42,
-            PathContainsInvalidUtf8Bytes(_) => 43,
-            SerdeFailed => 44,
-            SourceDoesNotExist(_) => 45,
-            SourceDoesNotHaveFilename(_) => 46,
-            SourceEqOutdir(_) => 47,
+            CommandLineArgumentConflict(_) => 33,
+            ControlFlow => 34,
+            DecryptionOutdirIsNonempty(_) => 35,
+            HashSpecConflict => 36,
+            IncrementalEncryptionDisabledForNow => 37,
+            InvalidSpreadDepth(_) => 38,
+            MetadataLoadFailed(_) => 39,
+            NonFatalReportFailed => 40,
+            Other(_) => 41,
+            OutdirIsNotDir(_) => 42,
+            PasswordConfirmationFail => 43,
+            PathContainsInvalidUtf8Bytes(_) => 44,
+            SerdeFailed => 45,
+            SourceDoesNotExist(_) => 46,
+            SourceDoesNotHaveFilename(_) => 47,
+            SourceEqOutdir(_) => 48,
         }
     }
 }
@@ -72,6 +74,7 @@ impl Display for CsyncErr {
         //
         match self {
             AuthenticationFail => w!("Authentication failed."),
+            CommandLineArgumentConflict(message) => w!("Conflicting command line args provided: `{}`", message),
             ControlFlow => w!("Control flow"),
             DecryptionOutdirIsNonempty(pbuf) => w!("Cannot decrypt to `--outdir={:?}` because it is not empty.", pbuf),
             HashSpecConflict => w!("Cannot specify the strength of the hash with params AND time."),
@@ -142,6 +145,7 @@ mod tests {
     fn exit_codes_are_unique() {
         let variants = vec![
             AuthenticationFail,
+            CommandLineArgumentConflict(String::new()),
             ControlFlow,
             DecryptionOutdirIsNonempty(PathBuf::from("")),
             HashSpecConflict,
@@ -163,6 +167,7 @@ mod tests {
             .par_iter()
             .filter(|v| match v {
                 AuthenticationFail => true,
+                CommandLineArgumentConflict(_) => true,
                 ControlFlow => true,
                 DecryptionOutdirIsNonempty(_) => true,
                 HashSpecConflict => true,

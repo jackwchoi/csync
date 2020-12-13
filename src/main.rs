@@ -189,7 +189,12 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
     //
     let external_spec = SyncerSpecExt::try_from(opts)?;
 
+    // TODO configure num threads
+    // https://docs.rs/rayon/1.5.0/rayon/struct.ThreadPoolBuilder.html
+    // rayon::ThreadPoolBuilder::new().num_threads(22).build_global().unwrap();
+
     // the key that the user entered
+    // TODO also, don't confirm if incremental build
     let confirm_password = !opts.decrypt && !opts.clean;
     let init_key = get_password(confirm_password)?;
 
@@ -287,6 +292,8 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
 
 #[cfg(test)]
 mod tests {
+    // this is mostly due to the fact that we use perm bits
+    // maybe
     #[test]
     fn os_is_unix() {
         assert!(cfg!(unix));

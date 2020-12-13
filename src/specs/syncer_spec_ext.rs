@@ -73,7 +73,8 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
         };
 
         Ok(match (clean, decrypt) {
-            (true, _) => {
+            (true, true) => csync_err!(CommandLineArgumentConflict, String::new())?,
+            (true, false) => {
                 SyncerSpecExt::Clean {
                     source: source.to_path_buf(),
                     verbose: *verbose,

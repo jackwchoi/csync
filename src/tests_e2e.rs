@@ -216,11 +216,6 @@ macro_rules! check_encrypt {
                 // hash of the directory structure, te see if anything changes
                 let out_dir_hash_after = hash_tree(&out_dir);
                 assert_eq!(out_dir_hash_before, out_dir_hash_after);
-
-                match out_dir.exists() {
-                    true => panic!("failed encryption should not create outdir"),
-                    false => (),
-                }
             },
         };
         output
@@ -883,6 +878,44 @@ mod fail {
             &format!("-o {}", path_as_str!(&out_dir.path())),
             "-v"
         );
+    }
+
+    mod command_line_argument_conflict {
+        use super::*;
+        
+        //
+        macro_rules! testgen {
+            //
+            ( $fn_name:ident, $( $arg:expr ),+ ) => {
+                //
+                #[test]
+                fn $fn_name() {
+                    //
+                    let exit_code = CsyncErr::CommandLineArgumentConflict(String::new()).exit_code();
+
+                    // same keys
+                    let key_1 = "aqMnSbXfScceMjJL5PCC7pHQ2ABeo6YF";
+                    let key_2 = key_1;
+
+                    //
+                    let source = tmpdir!().unwrap();
+                    let out_dir = tmpdir!().unwrap();
+
+                    // encryption checks
+                    check_core!(
+                        exit_code,
+                        key_1,
+                        key_2,
+                        path_as_str!(&source),
+                        &format!("-o {}", path_as_str!(&out_dir)),
+                        "-v"
+                        $( , $arg )+
+                    );
+                }
+            };
+        }
+
+        testgen!(clean_and_decrypt, "--clean", "--decrypt");
     }
 
     mod hash_spec_conflict {
