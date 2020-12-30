@@ -1,9 +1,6 @@
 use crate::{prelude::*, test_util::*, util::*};
 use std::path::Path;
-use std::{
-    io,
-    path::PathBuf,
-};
+use std::{io, path::PathBuf};
 
 // `&Path -> &str`
 macro_rules! path_as_str {

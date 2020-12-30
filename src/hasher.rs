@@ -4,37 +4,61 @@ use ring::{digest, pbkdf2};
 use scrypt::{scrypt, ScryptParams};
 use std::num::NonZeroU32;
 
+/// Generate a derived key using 1 iteration of `pbkdf2`, which should be identical to using
+/// `sha512` once.
+///
+/// This macro uses the macro `pbkdf2` internally, so refer to the docs of this macro for more info
+/// on the return type.
+///
+/// # Parameters
 macro_rules! sha512 {
+    //
     ( $key:expr ) => {
         pbkdf2!(ring::pbkdf2::PBKDF2_HMAC_SHA512, 1, $key)
     };
+    //
     ( $key:expr, $salt:expr ) => {
         pbkdf2!(ring::pbkdf2::PBKDF2_HMAC_SHA512, 1, $key, $salt)
     };
 }
 
+/// Generate a derived key using `pbkdf2`.
+///
+/// This macro uses the `crate::hasher::pbkdf2_custom` internally, so refer to the docs of this
+/// function for more info on the retrun type.
 macro_rules! pbkdf2 {
+    //
     ( $alg:expr, $num_iter:expr, $key:expr ) => {
         crate::hasher::pbkdf2_custom($alg, $num_iter, None, $key)
     };
+    //
     ( $alg:expr, $num_iter:expr, $key:expr, $salt:expr ) => {
         crate::hasher::pbkdf2_custom($alg, $num_iter, Some($salt), $key)
     };
 }
 
+/// Generate a derived key using `scrypt`.
+///
+/// This macro uses the `crate::hasher::scrypt` internally, so refer to the docs of this function
+/// for more info on the retrun type.
 macro_rules! scrypt {
+    //
     ( $key:expr ) => {
         scrypt!(impl $key, None, None, None)
     };
+    //
     ( $key:expr, $salt:expr ) => {
         scrypt!(impl $key, Some($salt), None, None)
     };
+    //
     ( $key:expr, $salt:expr, $params:expr ) => {
         scrypt!(impl $key, Some($salt), Some($params), None)
     };
+    //
     ( $key:expr, $salt:expr, $params:expr, $output_len:expr ) => {
         scrypt!(impl $key, Some($salt), Some($params), Some($output_len))
     };
+    //
     ( impl $key:expr, $salt_opt:expr, $params_opt:expr, $output_len_opt:expr ) => {
         crate::hasher::scrypt_custom($params_opt, $output_len_opt, $salt_opt, $key)
     };
@@ -68,6 +92,7 @@ pub fn scrypt_custom(
     Ok(buffer).map(SecureVec::from).map(CryptoSecureBytes)
 }
 
+///
 pub fn pbkdf2_custom(
     alg: pbkdf2::Algorithm,
     num_iter: u32,

@@ -31,6 +31,8 @@ mod crypt;
 #[cfg(test)]
 mod tests_e2e;
 
+////////////////////////////////  ////////////////////////////////
+
 use crate::{clargs::*, crypt::syncer::*, prelude::*, secure_vec::*, specs::prelude::*, util::*};
 use rayon::prelude::*;
 use std::{
@@ -40,6 +42,10 @@ use std::{
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
+
+////////////////////////////////  ////////////////////////////////
+
+assert_cfg!(unix, "Only Unix systems are supported for now");
 
 macro_rules! color {
     ( $color:ident, $fmt_str:literal $( , $arg:expr )* ) => {
@@ -61,8 +67,6 @@ struct SyncStats {
     total_dur: Duration,
     total_thru: f64,
 }
-
-assert_cfg!(unix, "Only Unix systems are supported for now");
 
 ///
 fn main() {
