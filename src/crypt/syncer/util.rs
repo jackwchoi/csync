@@ -22,6 +22,7 @@ use std::{
 };
 use walkdir::WalkDir;
 
+/// 
 pub fn report_syncer_spec(spec: &SyncerSpec) {
     let action = match spec {
         SyncerSpec::Encrypt { .. } => "Encrypt",
