@@ -203,10 +203,9 @@ impl Syncer {
                     // if from_dir failed, outdir must either be empty or non-existent
                     match (out_dir.exists(), out_dir.is_dir()) {
                         (false, _) => (),
-                        (true, true) => match std::fs::read_dir(out_dir).map(Iterator::count) {
-                            Ok(0) => (),
-                            Ok(_) => csync_err!(IncrementalEncryptionDisabledForNow)?,
-                            Err(_) => panic!("Failed to read `out_dir`"),
+                        (true, true) => match std::fs::read_dir(out_dir).map(Iterator::count)? {
+                            0 => (),
+                            _ => csync_err!(IncrementalEncryptionDisabledForNow)?,
                         },
                         (true, false) => csync_err!(OutdirIsNotDir, out_dir.to_path_buf())?,
                     }
@@ -222,7 +221,7 @@ impl Syncer {
 
     //
     fn with_spec(spec: SyncerSpec, init_key: InitialKey, derived_key_opt: Option<DerivedKey>) -> CsyncResult<Self> {
-        report_syncer_spec(&spec);
+        eprint!("{}", report_syncer_spec(&spec));
         match &spec {
             //
             SyncerSpec::Clean { .. } => todo!(),

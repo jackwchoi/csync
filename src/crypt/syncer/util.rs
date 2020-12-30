@@ -22,18 +22,18 @@ use std::{
 };
 use walkdir::WalkDir;
 
-/// 
-pub fn report_syncer_spec(spec: &SyncerSpec) {
+/// TODO maybe have a visitor for this later?
+pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
     let action = match spec {
         SyncerSpec::Encrypt { .. } => "Encrypt",
         SyncerSpec::Decrypt { .. } => "Decrypt",
         SyncerSpec::Clean { .. } => "Clean",
     };
 
-    macro_rules! eprintln_body {
+    macro_rules! format_body {
         ( $name:literal, $body:expr ) => {{
             let (main, extra) = $body;
-            eprintln!("{:>32}: {:>16} ({})", $name, main, extra)
+            format!("{:>32}: {:>16} ({})\n", $name, main, extra)
         }};
     }
     match spec {
@@ -59,23 +59,22 @@ pub fn report_syncer_spec(spec: &SyncerSpec) {
             spread_depth,
             verbose,
         } if *verbose => {
-            eprintln!("\n{}ing: {:?} -> {:?}", action, source, out_dir);
-            eprintln!();
-            eprintln_body!("Random salt", ("", format!("{}-bit", 8 * init_salt.0.unsecure().len())));
-            eprintln_body!("Spread depth", ("", format!("{}", **spread_depth)));
-            eprintln_body!(
+            let action_desc = format!("\n{}ing: {:?} -> {:?}\n\n", action, source, out_dir);
+            let salt_desc = format_body!("Random salt", ("", format!("{}-bit", 8 * init_salt.0.unsecure().len())));
+            let spread_depth_desc = format_body!("Spread depth", ("", format!("{}", **spread_depth)));
+            let auth_desc = format_body!(
                 "Authentication algorithm",
                 match authenticator_spec {
                     AuthenticatorSpec::HmacSha512 => ("HMAC-SHA512", "_"),
                 }
             );
-            eprintln_body!(
+            let comp_desc = format_body!(
                 "Compression algorithm",
                 match compressor_spec {
                     CompressorSpec::Zstd { level } => ("Zstandard", format!("level-{}", level)),
                 }
             );
-            eprintln_body!(
+            let cipher_desc = format_body!(
                 "Encryption algorithm",
                 match cipher_spec {
                     CipherSpec::Aes256Cbc { init_vec } =>
@@ -83,7 +82,7 @@ pub fn report_syncer_spec(spec: &SyncerSpec) {
                     CipherSpec::ChaCha20 { init_vec } => ("ChaCha20", format!("{}-bit salt", 8 * init_vec.0.unsecure().len())),
                 }
             );
-            eprintln_body!(
+            let key_deriv_desc = format_body!(
                 "Key-derivation algorithm",
                 match key_deriv_spec {
                     KeyDerivSpec::Pbkdf2 { num_iter, alg, salt } => (
@@ -116,9 +115,10 @@ pub fn report_syncer_spec(spec: &SyncerSpec) {
                     ),
                 }
             );
+            action_desc + &salt_desc + &spread_depth_desc + &auth_desc + &comp_desc + &cipher_desc + &key_deriv_desc
         }
         SyncerSpec::Clean { verbose, .. } if *verbose => todo!(),
-        _ => (),
+        _ => String::new(),
     }
 }
 
@@ -132,36 +132,32 @@ pub fn meta_map(root: &Path) -> impl ParallelIterator<Item = CsyncResult<(usize,
         .into_iter()
         .enumerate()
         .par_bridge()
-        .map(|(uid, entry_res)| match entry_res {
+        .map(|(uid, entry_res)| {
+            let entry = entry_res?;
             // :: DirEntry -> (PathBuf, SystemTime)
             // only handle regular files and dirs
-            Ok(entry) => {
-                match (entry.metadata(), entry.file_type()) {
-                    (Ok(meta), ftype) => {
-                        macro_rules! ok {
-                            ( $modified:expr, $file_type:expr ) => {
-                                Ok((
-                                    uid,
-                                    entry.into_path().canonicalize()?,
-                                    meta.permissions(),
-                                    $modified,
-                                    $file_type,
-                                ))
-                            };
-                        }
-                        match meta.modified() {
-                            // everything good
-                            Ok(modified) if ftype.is_file() => ok!(modified, FileType::File),
-                            Ok(modified) if ftype.is_dir() => ok!(modified, FileType::Dir),
-                            // not a file or dir, maybe support later
-                            Ok(_) => csync_err!(Other, format!("filetype not supported")),
-                            Err(err) => csync_err!(Other, format!("cannon read modified time: {}", err)),
-                        }
-                    }
-                    (Err(err), _) => csync_err!(Other, format!("cannot read metadata: {}", err)),
-                }
+            let meta = entry.metadata()?;
+            let ftype = entry.file_type();
+            //
+            macro_rules! ok {
+                ( $modified:expr, $file_type:expr ) => {
+                    Ok((
+                        uid,
+                        entry.into_path().canonicalize()?,
+                        meta.permissions(),
+                        $modified,
+                        $file_type,
+                    ))
+                };
             }
-            Err(err) => csync_err!(Other, format!("failed reading {}", err)),
+            //
+            match meta.modified()? {
+                // everything good
+                modified if ftype.is_file() => ok!(modified, FileType::File),
+                modified if ftype.is_dir() => ok!(modified, FileType::Dir),
+                // not a file or dir, maybe support later
+                _ => csync_err!(Other, format!("filetype not supported")),
+            }
         })
 }
 
@@ -205,14 +201,14 @@ pub fn path_to_spread(spread_depth: SpreadDepth, init_salt: &CryptoSecureBytes, 
     // into different dirs
     match path_as_string(path) {
         // compute a pathsafe-base64-encoded hash of the pathbuf
-        Some(s) => match base32path(sha512!(&s.into(), init_salt).0.unsecure()) {
+        Some(s) => {
+            let hash = base32path(sha512!(&s.into(), init_salt).0.unsecure())?;
             // get the first spreaod_depth chars of the hash, with '/' interopersed
-            Ok(hash) => Ok(PathBuf::from(
+            Ok(PathBuf::from(
                 (&hash[..*spread_depth as usize]).chars().intersperse('/').collect::<String>(),
-            )),
-            Err(err) => panic!("base64 encoding failed: {}", err),
-        },
-        None => panic!("path has non unicode chars"),
+            ))
+        }
+        None => csync_err!(Other, "".to_string()),
     }
 }
 

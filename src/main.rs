@@ -226,9 +226,10 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
 
             // TODO just report error using filtermap instead of stopping the whole thing
             let (result, time_taken) = time!(actions
-                .map(move |action_res| match action_res {
+                .map(move |action_res| {
+                    let action = action_res?;
                     // action and how long that action took
-                    Ok(action) => match (std::fs::metadata(action.src), std::fs::metadata(action.dest)) {
+                    match (std::fs::metadata(action.src), std::fs::metadata(action.dest)) {
                         // sizes oif the src and dest files in bytes
                         // TODO reduce meta calls by including this in meta map and propagating it
                         (Ok(meta_src), Ok(meta_dst)) => {
@@ -244,28 +245,27 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
                             Ok((src_bytes as f64, dst_bytes as f64))
                         }
                         _ => csync_err!(NonFatalReportFailed),
-                    },
-                    Err(err) => Err(err),
+                    }
                 })
                 .fold(
-                    || Ok((0usize, 0f64, 0f64)),
+                    || CsyncResult::Ok((0usize, 0f64, 0f64)),
                     |acc_res, res| {
-                        match (acc_res, res) {
-                            (Ok((count, src_size_acc, dst_size_acc)), Ok((src_size, dst_size))) => Ok((
-                                count + 1,               // counting one more
-                                src_size_acc + src_size, // sum up the size of src files in bytes
-                                dst_size_acc + dst_size, // sum up the size of src files in bytes
-                            )),
-                            (Err(err), _) | (_, Err(err)) => Err(err),
-                        }
-                    },
+                        let (count, src_size_acc, dst_size_acc) = acc_res?;
+                        let (src_size, dst_size) = res?;
+
+                        Ok((
+                            count + 1,               // counting one more
+                            src_size_acc + src_size, // sum up the size of src files in bytes
+                            dst_size_acc + dst_size, // sum up the size of src files in bytes
+                        ))
+                    }
                 )
                 .reduce(
                     || Ok((0usize, 0f64, 0f64)),
-                    |acc_res_a, acc_res_b| match (acc_res_a, acc_res_b) {
-                        (Ok((count_a, src_size_a, dst_size_a)), Ok((count_b, src_size_b, dst_size_b))) =>
-                            Ok((count_a + count_b, src_size_a + src_size_b, dst_size_a + dst_size_b,)),
-                        (Err(err), _) | (_, Err(err)) => Err(err),
+                    |acc_res_a, acc_res_b| {
+                        let (count_a, src_size_a, dst_size_a) = acc_res_a?;
+                        let (count_b, src_size_b, dst_size_b) = acc_res_b?;
+                        Ok((count_a + count_b, src_size_a + src_size_b, dst_size_a + dst_size_b))
                     },
                 ));
 
