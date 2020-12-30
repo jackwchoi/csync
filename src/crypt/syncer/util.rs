@@ -30,12 +30,21 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
         SyncerSpec::Clean { .. } => "Clean",
     };
 
+    // align things for pretty print
     macro_rules! format_body {
         ( $name:literal, $body:expr ) => {{
             let (main, extra) = $body;
             format!("{:>32}: {:>16} ({})\n", $name, main, extra)
         }};
     }
+
+    // length in bits
+    macro_rules! bit_len {
+        ( $vec:expr ) => {
+            8 * $vec.0.unsecure().len()
+        };
+    }
+
     match spec {
         SyncerSpec::Encrypt {
             authenticator_spec,
@@ -60,7 +69,7 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
             verbose,
         } if *verbose => {
             let action_desc = format!("\n{}ing: {:?} -> {:?}\n\n", action, source, out_dir);
-            let salt_desc = format_body!("Random salt", ("", format!("{}-bit", 8 * init_salt.0.unsecure().len())));
+            let salt_desc = format_body!("Random salt", ("", format!("{}-bit", bit_len!(init_salt))));
             let spread_depth_desc = format_body!("Spread depth", ("", format!("{}", **spread_depth)));
             let auth_desc = format_body!(
                 "Authentication algorithm",
@@ -77,9 +86,8 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
             let cipher_desc = format_body!(
                 "Encryption algorithm",
                 match cipher_spec {
-                    CipherSpec::Aes256Cbc { init_vec } =>
-                        ("AES-256-CBC", format!("{}-bit salt", 8 * init_vec.0.unsecure().len())),
-                    CipherSpec::ChaCha20 { init_vec } => ("ChaCha20", format!("{}-bit salt", 8 * init_vec.0.unsecure().len())),
+                    CipherSpec::Aes256Cbc { init_vec } => ("AES-256-CBC", format!("{}-bit salt", bit_len!(init_vec))),
+                    CipherSpec::ChaCha20 { init_vec } => ("ChaCha20", format!("{}-bit salt", bit_len!(init_vec))),
                 }
             );
             let key_deriv_desc = format_body!(
@@ -93,7 +101,7 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
                                 Pbkdf2Algorithm::HmacSha512 => "HMAC-SHA512",
                             },
                             num_iter,
-                            8 * salt.0.unsecure().len()
+                            bit_len!(salt)
                         )
                     ),
                     KeyDerivSpec::Scrypt {
@@ -110,7 +118,7 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
                             r,
                             p,
                             8 * output_len,
-                            8 * salt.0.unsecure().len()
+                            bit_len!(salt)
                         )
                     ),
                 }
@@ -122,9 +130,14 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
     }
 }
 
-// Mapping from paths under `root` to some of its metadata.
-//
-//
+/// # Parameters
+///
+/// 1. `root`:
+///
+/// # Returns
+///
+/// Various metadata for each file under `root`. The purpose of this function is to minimize the
+/// number of IO calls.
 pub fn meta_map(root: &Path) -> impl ParallelIterator<Item = CsyncResult<(usize, PathBuf, Permissions, SystemTime, FileType)>> {
     debug_assert!(is_canonical(&root).unwrap());
     WalkDir::new(root)
@@ -203,18 +216,18 @@ pub fn path_to_spread(spread_depth: SpreadDepth, init_salt: &CryptoSecureBytes, 
         // compute a pathsafe-base64-encoded hash of the pathbuf
         Some(s) => {
             let hash = base32path(sha512!(&s.into(), init_salt).0.unsecure())?;
+            let hash_str = &hash[..*spread_depth as usize];
+            let hash_string_interspersed: String = hash_str.chars().intersperse('/').collect();
             // get the first spreaod_depth chars of the hash, with '/' interopersed
-            Ok(PathBuf::from(
-                (&hash[..*spread_depth as usize]).chars().intersperse('/').collect::<String>(),
-            ))
+            Ok(PathBuf::from(hash_string_interspersed))
         }
         None => csync_err!(Other, "".to_string()),
     }
 }
 
-// # Parameters
-//
-// 1.
+/// # Parameters
+///
+/// 1.
 #[inline]
 pub fn spread_to_hash(spread: &Path) -> CsyncResult<CryptoSecureBytes> {
     // get a hash of the chars in the spread dir path, to use as the initialization
@@ -225,17 +238,17 @@ pub fn spread_to_hash(spread: &Path) -> CsyncResult<CryptoSecureBytes> {
     }
 }
 
-// # Parameters
-//
-// 1. `src_root`:
-// 1. `src_path`:
-// 1. `file_type`:
-// 1. `spread_hash`:
-// 1. `derived_key`:
-//
-// # Returns
-//
-// a
+/// # Parameters
+///
+/// 1. `src_root`:
+/// 1. `src_path`:
+/// 1. `file_type`:
+/// 1. `spread_hash`:
+/// 1. `derived_key`:
+///
+/// # Returns
+///
+/// a
 pub fn path_to_cipherpath(
     src_root: &Path,
     src_path: &Path,

@@ -7,13 +7,12 @@ use structopt::StructOpt;
 ///
 /// `csync` uses the following default configurations which can be customized
 ///
-/// TODO change
 ///                     Random salt:                  (4096-bit)
 ///                    Spread depth:                  (3)
 ///        Authentication algorithm:      HMAC-SHA512 (_)
 ///           Compression algorithm:        Zstandard (level-3)
 ///            Encryption algorithm:         ChaCha20 (4096-bit salt)
-///        Key-derivation algorithm:           Scrypt (log_n: 21, r: 8, p: 1, 4096-bit output, 4096-bit salt)
+///        Key-derivation algorithm:           Scrypt (log_n: 20, r: 8, p: 1, 4096-bit output, 4096-bit salt)
 ///
 /// Project home page: `https://github.com/jackwchoi/csync`
 #[derive(Clone, Debug, StructOpt)]

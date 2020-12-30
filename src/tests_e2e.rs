@@ -582,6 +582,46 @@ mod fail {
         //
         assert!(dir_is_empty(out_dir.path()));
     }
+    
+    #[test]
+    fn metadata_load_failed() {
+        //
+        let decryption_exit_code = CsyncErr::MetadataLoadFailed(String::new()).exit_code();
+        
+        //
+        let source = tmpdir!().unwrap();
+        let source = source.path();
+
+        // shadow because we don't want move or drop
+        let out_dir = tmpdir!().unwrap();
+        let out_dir = out_dir.path();
+
+        // shadow because we don't want move or drop
+        let out_out_dir = tmpdir!().unwrap();
+        let out_out_dir = out_out_dir.path();
+
+        // same keys, so it shouldn't fail from mismatch
+        let key_1 = "JPSIXf4R4tQcOWe9U3paJTcKoUiEQmHm";
+        let key_2 = key_1;
+
+        // decryption checks
+        check_decrypt!(
+            decryption_exit_code,
+            &out_dir,
+            &out_out_dir,
+            source,
+            key_1,
+            key_2,
+            path_as_str!(&out_dir),
+            &format!("-o {} -d", path_as_str!(out_out_dir)),
+            "-v"
+        );
+
+        //
+        assert!(dir_is_empty(&source));
+        assert!(dir_is_empty(&out_dir));
+        assert!(dir_is_empty(&out_out_dir));
+    }
 
     #[test]
     fn authentication_fail() {
@@ -589,6 +629,7 @@ mod fail {
         let encryption_exit_code = 0;
         let decryption_exit_code = CsyncErr::AuthenticationFail.exit_code();
 
+        //
         let source = tmpdir!().unwrap();
         let source = source.path();
 
@@ -607,8 +648,8 @@ mod fail {
         // encryption checks
         check_encrypt!(
             encryption_exit_code,
-            source,
-            out_dir,
+            &source,
+            &out_dir,
             key_1,
             key_2,
             path_as_str!(source),
@@ -624,7 +665,7 @@ mod fail {
         check_decrypt!(
             decryption_exit_code,
             &out_dir,
-            out_out_dir,
+            &out_out_dir,
             source,
             key_1,
             key_2,
