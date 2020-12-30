@@ -582,12 +582,12 @@ mod fail {
         //
         assert!(dir_is_empty(out_dir.path()));
     }
-    
+
     #[test]
     fn metadata_load_failed() {
         //
         let decryption_exit_code = CsyncErr::MetadataLoadFailed(String::new()).exit_code();
-        
+
         //
         let source = tmpdir!().unwrap();
         let source = source.path();
@@ -831,7 +831,6 @@ mod fail {
     SourceDoesNotHaveFilename(PathBuf),    //
     SourceEqOutdir(PathBuf),               //
 
-    metadata_load_failed
     non_fatal_report_failed
     other
     path_contains_invalid_utf8_bytes
