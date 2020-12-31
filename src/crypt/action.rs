@@ -17,27 +17,27 @@ use std::{
 ///
 /// `src` and `dest` are guarantede to be unique
 #[derive(Debug)]
-pub struct Action {
+pub struct Action<'a> {
     pub dest: PathBuf,
     pub src: PathBuf,
     action_spec: ActionSpec,
-    syncer_spec: SyncerSpec,
+    syncer_spec: &'a SyncerSpec,
     file_type: FileType,
 }
 
 ///
-impl Action {
+impl<'a> Action<'a> {
     /// # Parameters
     ///
     /// SALTS IN ENCRYPTION CONFIG WILL BE OVERWRTTEN
     pub fn new(
-        syncer_spec: &SyncerSpec,
+        syncer_spec: &'a SyncerSpec,
         src: &Path,
         dest: &Path,
         file_type: FileType,
         unix_mode_opt: Option<u32>,
         key_hash: &DerivedKey,
-    ) -> CsyncResult<Action> {
+    ) -> CsyncResult<Action<'a>> {
         macro_rules! get_unix_mode {
             () => {
                 Some(metadata(src)?.permissions().mode())
@@ -51,7 +51,7 @@ impl Action {
                     dest: dest.to_path_buf(),
                     file_type,
                     src: src.to_path_buf(),
-                    syncer_spec: syncer_spec.clone(),
+                    syncer_spec,
                 })
             };
         };
