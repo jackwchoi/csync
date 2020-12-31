@@ -16,7 +16,7 @@ use std::{
 /// Conceptually a mapping from some path `src` to a different path `dest`.
 ///
 /// `src` and `dest` are guarantede to be unique
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug)]
 pub struct Action {
     pub dest: PathBuf,
     pub src: PathBuf,
@@ -57,7 +57,7 @@ impl Action {
         };
         match syncer_spec {
             SyncerSpec::Encrypt { cipher_spec, .. } => action!(cipher_spec, unix_mode_opt.or(get_unix_mode!()), key_hash),
-            SyncerSpec::Decrypt { cipher_spec, .. } => action!(cipher_spec, get_unix_mode!(), key_hash),
+            SyncerSpec::Decrypt { cipher_spec, .. } => action!(cipher_spec, unix_mode_opt.or(get_unix_mode!()), key_hash),
             SyncerSpec::Clean { .. } => todo!(),
         }
     }
@@ -66,9 +66,14 @@ impl Action {
     ///
     /// 1. `arena`: some directory such that  `Action`
     pub fn manifest(self, arena: &Path, key_hash: &DerivedKey) -> CsyncResult<Self> {
-        let action_arena = arena.join(format!("{}", thread_id::get()));
+        //
+        let tid = thread_id::get().to_string();
+        let action_arena = arena.join(tid);
+
+        //
         create_dir_all_if_nexists(&action_arena)?;
 
+        //
         match &self.syncer_spec {
             SyncerSpec::Encrypt { .. } => self.encrypt(&action_arena, key_hash),
             SyncerSpec::Decrypt { .. } => self.decrypt(&action_arena, key_hash),
