@@ -45,8 +45,19 @@ use structopt::StructOpt;
 
 ////////////////////////////////  ////////////////////////////////
 
+// TODO
+// 1. dry run flag to show which files would be run on
+// 2. incremental build
+
 assert_cfg!(unix, "Only Unix systems are supported for now");
 
+// Use like `format!`, except that use `$color` is an additional argument that goes in the front
+//
+// # Parameters
+//
+// 1. `$color`: variant of `ansi_term::Colour`, for example `Green` or `Red`
+// 1. `$fmt_str`:
+// 1. `$arg`:
 macro_rules! color {
     ( $color:ident, $fmt_str:literal $( , $arg:expr )* ) => {
         ansi_term::Colour::$color.paint(format!($fmt_str $( , $arg )*))
@@ -68,34 +79,40 @@ struct SyncStats {
     total_thru: f64,
 }
 
-///
+//
 fn main() {
     // parse the cli args
     let opts = clargs::Opts::from_args();
 
     //
     match run(&opts) {
+        //
         Ok(RunResult { sync_stats, .. }) => {
             eprintln!("\n{}", sync_stats);
         }
+        //
         Err(err) => {
             //
-            eprintln!("{}", color!(Red, "csync: ERROR {}", err));
+            let err_header = color!(Red, "[csync error]");
+            eprintln!("{}: {}", err_header, err);
 
             // this is used to uniquely identify the types of errors, for testing purposes
-            std::process::exit(err.exit_code());
+            let exit_code = err.exit_code();
+            debug_assert_ne!(exit_code, 0);
+            //
+            std::process::exit(exit_code);
         }
     }
 }
 
-///
+//
 fn get_password(confirm: bool) -> CsyncResult<CryptoSecureBytes> {
     //
     let get = |disp| match rpassword::prompt_password_stderr(disp) {
         Ok(pw) => Ok(sha512!(&pw.into())),
         Err(err) => csync_err!(Other, format!("Problem reading the password: {}", err)),
     };
-    let initial = get("Enter your password: ")?;
+    let initial = get("  Enter your password: ")?;
 
     match confirm {
         true => {
@@ -111,6 +128,7 @@ fn get_password(confirm: bool) -> CsyncResult<CryptoSecureBytes> {
     }
 }
 
+//
 fn reporting_thread(start: Instant, receiver: Receiver<Option<(usize, usize)>>) -> std::thread::JoinHandle<()> {
     //
     std::thread::spawn(move || {
@@ -188,7 +206,7 @@ impl SyncStats {
 }
 
 // TODO use macro to circomvent this again
-///
+//
 fn run(opts: &Opts) -> CsyncResult<RunResult> {
     //
     let external_spec = SyncerSpecExt::try_from(opts)?;
