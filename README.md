@@ -4,7 +4,12 @@
 [![Colmac documentation](https://docs.rs/colmac/badge.svg)](https://docs.rs/colmac)
 -->
 
-CryptSync (`csync`) is a tool designed to efficiently compress and encrypt a large set of files.
+CryptSync (`csync`) efficiently compresses and encrypts a set of files and directories.
+
+/// `csync` is a one-to-one mapping from source files to their compressed/encrypted counterpart,
+/// unlike tools like `tar` that maps a set of files to a single archive file. This aspect of
+/// `csync` allows for an incremental encryption, where subsequent encryptions on the same
+/// directory only works on 
 
 ## Summary of `csync`
 

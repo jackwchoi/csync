@@ -73,28 +73,12 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
             Opts::Clean { .. } => {}
         };
 
-        /*
-        let Opts {
-            auth_opt,
-            cipher_opt,
-            clean,
-            compressor_opt,
-            decrypt,
-            salt_len_opt,
-            out_dir,
-            source,
-            spread_depth_opt,
-            verbose,
-            ..
-        } = opts;
-        */
-
         Ok(match opts {
             Opts::Encrypt {
-                auth_opt,
-                cipher_opt,
-                compressor_opt,
-                salt_len_opt,
+                auth,
+                cipher,
+                compressor,
+                salt_len,
                 out_dir,
                 source,
                 spread_depth_opt,
@@ -108,31 +92,28 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                         false => csync_err!(InvalidSpreadDepth, *n)?,
                     },
                 };
-                let salt_len = salt_len_opt.map(|x| x as usize).unwrap_or(DEFAULT_SALT_LEN);
+                let salt_len = *salt_len as usize;
 
                 let kd_spec_ext = extract_kd_opt(&opts)?;
 
-                let auth_spec = match auth_opt.as_ref().map(String::as_str) {
-                    None => Default::default(),
-                    Some("hmac-sha512") => AuthenticatorSpec::HmacSha512,
-                    Some(_) => todo!(),
+                let auth_spec = match auth.as_str() {
+                    "hmac-sha512" => AuthenticatorSpec::HmacSha512,
+                    _ => todo!(),
                 };
-                let cipher_spec = match cipher_opt.as_ref().map(String::as_str) {
-                    None => Default::default(),
-                    Some("aes256cbc") => CipherSpec::Aes256Cbc {
+                let cipher_spec = match cipher.as_str() {
+                    "aes256cbc" => CipherSpec::Aes256Cbc {
                         init_vec: CryptoSecureBytes(rng!(salt_len).0),
                     },
-                    Some("chacha20") => CipherSpec::ChaCha20 {
+                    "chacha20" => CipherSpec::ChaCha20 {
                         init_vec: CryptoSecureBytes(rng!(salt_len).0),
                     },
-                    Some(_) => todo!(),
+                    _ => todo!(),
                 };
-                let compressor_spec = match compressor_opt.as_ref().map(String::as_str) {
-                    None => Default::default(),
-                    Some("zstd") => CompressorSpec::Zstd {
+                let compressor_spec = match compressor.as_str() {
+                    "zstd" => CompressorSpec::Zstd {
                         level: DEFAULT_ZSTD_LEVEL,
                     },
-                    Some(_) => todo!(),
+                    _ => todo!(),
                 };
 
                 SyncerSpecExt::Encrypt {

@@ -1,66 +1,45 @@
+use crate::prelude::DEFAULT_SALT_LEN_STR;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-/// Crypt-Sync (`csync`) creates a compressed and encrypted archive which can be incrementally
-/// updated, meaning that on successive runs `csync` will only sync the files that have changed
-/// since the last sync.
+/// CryptSync (`csync`) efficiently compresses and encrypts a set of files and directories.
 ///
-/// `csync` uses the following default configurations which can be customized
-///
-///                     Random salt:                  (4096-bit)
-///                    Spread depth:                  (3)
-///        Authentication algorithm:      HMAC-SHA512 (_)
-///           Compression algorithm:        Zstandard (level-3)
-///            Encryption algorithm:         ChaCha20 (4096-bit salt)
-///        Key-derivation algorithm:           Scrypt (log_n: 20, r: 8, p: 1, 4096-bit output, 4096-bit salt)
+/// See the help-page for each subcommand like `csync <SUBCOMMAND> --help`, for example
+/// `csync encrypt --help`.
 ///
 /// Project home page: `https://github.com/jackwchoi/csync`
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "csync")]
 pub enum Opts {
+    /// Encrypt a directory to a `csync` directory.
+    ///
+    /// You can configure the following aspects of the encryption process:
+    /// AUTHENTICATION ALGORITHM (`--auth`), COMPRESSION ALGORITHM (`--compressor`), ENCRYPTION
+    /// ALGORITHM (`--cipher`), KEY DERIVATION ALGORITHM (`--pbkdf2-*` and `--scrypt-*`),
+    /// LENGTHS OF RANDOM SALTS (`--salt-len`), NUMBER OF THREADS (`--num-threads`), SPREAD
+    /// DEPTH (`--spread_depth`)
     Encrypt {
         /// Use this authentication algorithm; supported algorithms are: `hmac-sha512`.
-        /// Defaults to `hmac-sha512`.
-        #[structopt(long = "auth")]
-        auth_opt: Option<String>,
+        #[structopt(long, default_value = "hmac-sha512")]
+        auth: String,
 
         /// Use this encryption algorithm; supported algorithms are: `aes256cbc` and `chacha20`.
-        /// Defaults to `chacha20`.
-        #[structopt(long = "cipher")]
-        cipher_opt: Option<String>,
+        #[structopt(long, default_value = "chacha20")]
+        cipher: String,
 
-        /// Use salts that are this many bytes long.
-        #[structopt(long = "salt-len")]
-        salt_len_opt: Option<u16>,
+        /// Use this compression algorithm to use; supported algorithms are: `zstd`.
+        #[structopt(long, default_value = "zstd")]
+        compressor: String,
 
         /// Use this many threads; defaults to the number of cores available on the machine.
-        #[structopt(short = "t", long = "num-threads")]
+        #[structopt(short, long = "num-threads")]
         num_threads_opt: Option<usize>,
 
-        /*
-        /// Clean the csync directory, making it as compact as possible.
-        #[structopt(short="C",long = "no-color")]
-        no_color: bool,
-        */
-        /// Use this compression algorithm to use; supported algorithms are: `zstd`.
-        /// Defaults to `zstd`.
-        #[structopt(long = "compressor")]
-        compressor_opt: Option<String>,
-
-        /// Decrypt the provided `csync` directory.
-        #[structopt(short = "d", long = "decrypt")]
-        decrypt: bool,
-
-        /*
-        /// Run diagnostics and see which options make the most sense for your machine.
-        #[structopt(long = "dignostics")]
-        diagnostics: bool,
-        */
         /// The csync directory to be created. If a directory exists under this path, a csync directory
         /// will be created with a basename identical name as the source directory. If a directory does
         /// not exist under this path, one will be created.
         /// TODO make this default for --clean
-        #[structopt(short = "o", long = "outdir", parse(from_os_str))]
+        #[structopt(short, long, parse(from_os_str))]
         out_dir: PathBuf,
 
         /// Use this algorithm within `pbkdf2`; supported options are `hmac-sha512`.
@@ -90,6 +69,10 @@ pub enum Opts {
         #[structopt(long = "scrypt-output-len")]
         scrypt_output_len_opt: Option<usize>,
 
+        /// Use salts that are this many bytes long.
+        #[structopt(long, default_value=DEFAULT_SALT_LEN_STR)]
+        salt_len: u16,
+
         /// The source directory to csync.
         #[structopt(parse(from_os_str))]
         source: PathBuf,
@@ -99,40 +82,43 @@ pub enum Opts {
         spread_depth_opt: Option<usize>,
 
         /// Print information like step-by-step reporting and timing informations.
-        #[structopt(short = "v", long = "verbose")]
+        #[structopt(short, long)]
         verbose: bool,
     },
-    Decrypt {
-        /// Print information like step-by-step reporting and timing informations.
-        #[structopt(short = "v", long = "verbose")]
-        verbose: bool,
 
+    /// Decrypt a `csync` directory back to its plaintext form.
+    Decrypt {
         /// Use this many threads; defaults to the number of cores available on the machine.
-        #[structopt(short = "t", long = "num-threads")]
+        #[structopt(short, long = "num-threads")]
         num_threads_opt: Option<usize>,
 
         /// The csync directory to be created. If a directory exists under this path, a csync directory
         /// will be created with a basename identical name as the source directory. If a directory does
         /// not exist under this path, one will be created.
-        /// TODO make this default for --clean
-        #[structopt(short = "o", long = "outdir", parse(from_os_str))]
+        #[structopt(short, long, parse(from_os_str))]
         out_dir: PathBuf,
 
         /// The source directory to csync.
         #[structopt(parse(from_os_str))]
         source: PathBuf,
-    },
-    Clean {
-        /// Print information like step-by-step reporting and timing informations.
-        #[structopt(short = "v", long = "verbose")]
-        verbose: bool,
 
+        /// Print information like step-by-step reporting and timing informations.
+        #[structopt(short, long)]
+        verbose: bool,
+    },
+
+    /// Clean a `csync` directory by making it as compact as possible.
+    Clean {
         /// Use this many threads; defaults to the number of cores available on the machine.
-        #[structopt(short = "t", long = "num-threads")]
+        #[structopt(short, long = "num-threads")]
         num_threads_opt: Option<usize>,
 
         /// The source directory to csync.
         #[structopt(parse(from_os_str))]
         source: PathBuf,
+
+        /// Print information like step-by-step reporting and timing informations.
+        #[structopt(short, long)]
+        verbose: bool,
     },
 }

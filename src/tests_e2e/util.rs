@@ -109,7 +109,7 @@ macro_rules! check_core {
         $exit_code_expected:expr,
         $key_1:expr,
         $key_2:expr,
-        $subcommand:literal, 
+        $subcommand:literal,
         $( $arg:expr ),+
     ) => {{
         // `std::process::Output` resulting from the child proc
