@@ -1,11 +1,16 @@
 use crate::{prelude::*, secure_vec::*, specs::key_deriv_spec::*};
 use serde::{Deserialize, Serialize};
 
-/// Use `Default::default()` as the constructor if you are not sure what you are doing.
+///
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct RehashSpec(KeyDerivSpec);
 
 impl RehashSpec {
+    ///
+    pub fn with_key_deriv_spec(kd_spec: KeyDerivSpec) -> Self {
+        Self(kd_spec)
+    }
+
     #[inline]
     pub fn rehash(&self, key_hash: &DerivedKey) -> CsyncResult<RehashedKey> {
         self.0.derive(&key_hash.0 .0).map(|derived_key| RehashedKey(derived_key.0))
@@ -21,17 +26,3 @@ impl RehashSpec {
     }
 }
 
-///
-impl Default for RehashSpec {
-    #[inline]
-    fn default() -> Self {
-        // this does not need to be costly
-        Self(KeyDerivSpec::Scrypt {
-            log_n: 12,
-            r: 8,
-            p: 1,
-            salt: CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0),
-            output_len: DEFAULT_SALT_LEN,
-        })
-    }
-}

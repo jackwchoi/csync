@@ -24,10 +24,3 @@ impl CipherSpec {
         }
     }
 }
-///
-impl Default for CipherSpec {
-    #[inline]
-    fn default() -> Self {
-        Self::ChaCha20 { init_vec: rand_salt!() }
-    }
-}

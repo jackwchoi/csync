@@ -119,20 +119,6 @@ pub enum KeyDerivSpec {
     },
 }
 
-impl Default for KeyDerivSpec {
-    // TODO change to scrypt
-    #[inline]
-    fn default() -> Self {
-        KeyDerivSpec::Scrypt {
-            log_n: DEFAULT_SCRYPT_LOG_N,
-            r: DEFAULT_SCRYPT_R,
-            p: DEFAULT_SCRYPT_P,
-            salt: CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0),
-            output_len: DEFAULT_SALT_LEN,
-        }
-    }
-}
-
 impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
     type Error = CsyncErr;
 
@@ -147,7 +133,7 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                 macro_rules! pbkdf2_spec {
                     ( $num_iter:expr ) => {
                         KeyDerivSpec::Pbkdf2 {
-                            alg: unwrap_or_default(alg_opt.clone()),
+                            alg: alg_opt.clone().unwrap_or(Default::default()),
                             num_iter: $num_iter,
                             salt: CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0),
                         }
@@ -157,7 +143,7 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                     (Some(num_iter), None) => pbkdf2_spec!(*num_iter),
                     (None, time_opt) => {
                         let time = time_opt.unwrap_or(DEFAULT_TIME_TO_HASH);
-                        let alg = unwrap_or_default(*alg_opt);
+                        let alg = alg_opt.unwrap_or(Default::default());
                         pbkdf2_spec!(determine_pbkdf2_num_iter(alg.ring(), time))
                     }
                     _ => csync_err!(HashSpecConflict)?,

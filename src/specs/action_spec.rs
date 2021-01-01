@@ -1,7 +1,7 @@
 use crate::{
     prelude::*,
     secure_vec::*,
-    specs::{cipher_spec::*, rehash_spec::*},
+    specs::{cipher_spec::*, key_deriv_spec::*, rehash_spec::*},
 };
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +23,13 @@ impl ActionSpec {
     /// 1. `key_hash`:
     pub fn new(cipher_spec: &CipherSpec, unix_mode: Option<u32>, key_hash: &DerivedKey) -> CsyncResult<Self> {
         // rehash the key hash
-        let rehash_spec: RehashSpec = Default::default();
+        let rehash_spec: RehashSpec = RehashSpec::with_key_deriv_spec(KeyDerivSpec::Scrypt {
+            log_n: 12,
+            r: 8,
+            p: 1,
+            salt: CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0),
+            output_len: DEFAULT_SALT_LEN,
+        });
         let rehash = rehash_spec.rehash(key_hash)?;
 
         //

@@ -172,7 +172,14 @@ fn extract_kd_opt(opts: &Opts) -> CsyncResult<KeyDerivSpecExt> {
                 scrypt_output_len_opt,
             ) {
                 //
-                (None, None, None, None, None, None, None, None) => Ok(Default::default()),
+                (None, None, None, None, None, None, None, None) => Ok(KeyDerivSpecExt::Scrypt {
+                    log_n_opt: None,
+                    r_opt: None,
+                    p_opt: None,
+                    time_opt: None,
+                    output_len_opt: None,
+                    // TODO salt len
+                }),
                 // pbkdf2
                 (alg_opt, time_to_hash, num_iter_opt, None, None, None, None, None) => {
                     macro_rules! t {

@@ -20,19 +20,6 @@ pub fn adjust_value(value: f64, base_unit: &str) -> (String, String) {
     (adjusted_value, unit)
 }
 
-/// # Returns
-///
-/// The content of `defaultable_opt` if it exists.
-///
-/// Returns the default value if not present.
-#[inline]
-pub fn unwrap_or_default<D>(defaultable_opt: Option<D>) -> D
-where
-    D: Default,
-{
-    defaultable_opt.unwrap_or(Default::default())
-}
-
 ///
 #[inline]
 pub fn serialize<'a, T>(strct: &'a T) -> CsyncResult<impl serde::Deserialize<'a> + Into<SecureBytes> + AsRef<[u8]>>

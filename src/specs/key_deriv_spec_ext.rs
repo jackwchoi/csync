@@ -26,20 +26,6 @@ pub enum KeyDerivSpecExt {
     },
 }
 
-///
-impl Default for KeyDerivSpecExt {
-    // TODO change to scrypt
-    fn default() -> Self {
-        KeyDerivSpecExt::Scrypt {
-            log_n_opt: None,
-            r_opt: None,
-            p_opt: None,
-            time_opt: None,
-            output_len_opt: None,
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Pbkdf2Algorithm {
     HmacSha512,

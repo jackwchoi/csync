@@ -71,7 +71,7 @@ pub enum Opts {
 
         /// Use salts that are this many bytes long.
         #[structopt(long, default_value=DEFAULT_SALT_LEN_STR)]
-        salt_len: u16,
+        salt_len: u32,
 
         /// The source directory to csync.
         #[structopt(parse(from_os_str))]
