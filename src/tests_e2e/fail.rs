@@ -21,6 +21,7 @@ fn password_confirmation_fail_during_encryption() {
         exit_code,
         key_1,
         key_2,
+        "encrypt",
         path_as_str!(&source.path()),
         &format!("-o {}", path_as_str!(out_dir.path())),
         "-v"
@@ -60,7 +61,7 @@ fn metadata_load_failed() {
         key_1,
         key_2,
         path_as_str!(&out_dir),
-        &format!("-o {} -d", path_as_str!(out_out_dir)),
+        &format!("-o {}", path_as_str!(out_out_dir)),
         "-v"
     );
 
@@ -117,7 +118,7 @@ fn authentication_fail() {
         key_1,
         key_2,
         path_as_str!(&out_dir),
-        &format!("-o {} -d", path_as_str!(out_out_dir)),
+        &format!("-o {}", path_as_str!(out_out_dir)),
         "-v"
     );
 
@@ -150,6 +151,7 @@ mod source_does_not_exist {
             exit_code,
             key_1,
             key_2,
+            "encrypt",
             path_as_str!(&source),
             &format!("-o {}", path_as_str!(out_dir.path())),
             "-v"
@@ -207,7 +209,7 @@ mod source_does_not_exist {
             key_1,
             key_2,
             path_as_str!(&dne_out_dir),
-            &format!("-o {} -d", path_as_str!(out_out_dir)),
+            &format!("-o {}", path_as_str!(out_out_dir)),
             "-v"
         );
 
@@ -255,9 +257,10 @@ fn decryption_outdir_is_nonempty() {
         decryption_exit_code,
         key_1,
         key_2,
+        "decrypt",
         path_as_str!(out_dir.path()),
         &format!("-o {}", path_as_str!(out_out_dir.path())),
-        "-v -d"
+        "-v"
     );
 }
 
@@ -312,6 +315,7 @@ fn outdir_is_not_dir() {
         exit_code,
         key_1,
         key_2,
+        "encrypt",
         path_as_str!(&source),
         &format!("-o {}", path_as_str!(&out_dir)),
         "-v"
@@ -335,6 +339,7 @@ fn source_eq_outdir() {
         exit_code,
         key_1,
         key_2,
+        "encrypt",
         path_as_str!(&source.path()),
         &format!("-o {}", path_as_str!(&source.path())),
         "-v"
@@ -361,48 +366,11 @@ fn source_does_not_have_filename() {
         exit_code,
         key_1,
         key_2,
+        "encrypt",
         path_as_str!(&source),
         &format!("-o {}", path_as_str!(&out_dir.path())),
         "-v"
     );
-}
-
-mod command_line_argument_conflict {
-    use super::*;
-
-    //
-    macro_rules! testgen {
-            //
-            ( $fn_name:ident, $( $arg:expr ),+ ) => {
-                //
-                #[test]
-                fn $fn_name() {
-                    //
-                    let exit_code = CsyncErr::CommandLineArgumentConflict(String::new()).exit_code();
-
-                    // same keys
-                    let key_1 = "aqMnSbXfScceMjJL5PCC7pHQ2ABeo6YF";
-                    let key_2 = key_1;
-
-                    //
-                    let source = tmpdir!().unwrap();
-                    let out_dir = tmpdir!().unwrap();
-
-                    // encryption checks
-                    check_core!(
-                        exit_code,
-                        key_1,
-                        key_2,
-                        path_as_str!(&source),
-                        &format!("-o {}", path_as_str!(&out_dir)),
-                        "-v"
-                        $( , $arg )+
-                    );
-                }
-            };
-        }
-
-    testgen!(clean_and_decrypt, "--clean", "--decrypt");
 }
 
 mod hash_spec_conflict {
@@ -431,6 +399,7 @@ mod hash_spec_conflict {
                         exit_code,
                         key_1,
                         key_2,
+                        "encrypt",
                         path_as_str!(&source),
                         &format!("-o {}", path_as_str!(&out_dir)),
                         "-v"
@@ -504,6 +473,7 @@ mod invalid_spread_depth {
                         exit_code,
                         key_1,
                         key_2,
+                        "encrypt",
                         path_as_str!(&source),
                         &format!("-o {}", path_as_str!(&out_dir)),
                         "-v"
@@ -548,6 +518,7 @@ mod incremental_encryption_disabled_for_now {
                     exit_code,
                     key_1,
                     key_2,
+                    "encrypt",
                     path_as_str!(&source),
                     &format!("-o {}", path_as_str!(&out_dir)),
                     "-v"

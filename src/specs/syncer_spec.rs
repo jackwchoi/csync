@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, path::PathBuf};
 
 ///
-#[derive(Clone, Debug, Deserialize,  Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SyncerSpec {
     Encrypt {
         //

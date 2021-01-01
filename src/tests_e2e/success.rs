@@ -52,7 +52,7 @@ fn encrypted_dir_basename_changed() {
         key_1,
         key_2,
         path_as_str!(&renamed_out_dir),
-        &format!("-o {} -d", path_as_str!(&out_out_dir)),
+        &format!("-o {}", path_as_str!(&out_out_dir)),
         "-v"
     );
 }
@@ -104,7 +104,7 @@ macro_rules! generate_success_body {
                     key_1,
                     key_2,
                     path_as_str!(out_dir),
-                    &format!("-o {} -d", path_as_str!(out_out_dir)),
+                    &format!("-o {}", path_as_str!(out_out_dir)),
                     "-v"
                 );
             }

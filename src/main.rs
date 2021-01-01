@@ -33,7 +33,14 @@ mod tests_e2e;
 
 ////////////////////////////////  ////////////////////////////////
 
-use crate::{clargs::*, crypt::syncer::*, prelude::*, secure_vec::*, specs::prelude::*, util::*};
+use crate::{
+    clargs::{Opts, Opts::*},
+    crypt::syncer::*,
+    prelude::*,
+    secure_vec::*,
+    specs::prelude::*,
+    util::*,
+};
 use rayon::prelude::*;
 use std::{
     convert::TryFrom,
@@ -211,16 +218,31 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
     //
     let external_spec = SyncerSpecExt::try_from(opts)?;
 
-    if let Some(num_threads) = opts.num_threads {
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(num_threads)
-            .build_global()
-            .unwrap();
+    //
+    match opts {
+        Encrypt {
+            num_threads_opt: Some(n),
+            ..
+        }
+        | Decrypt {
+            num_threads_opt: Some(n),
+            ..
+        }
+        | Clean {
+            num_threads_opt: Some(n),
+            ..
+        } => {
+            rayon::ThreadPoolBuilder::new().num_threads(*n).build_global().unwrap();
+        }
+        _ => (),
     }
 
     // the key that the user entered
     // TODO also, don't confirm if incremental build
-    let confirm_password = !opts.decrypt && !opts.clean;
+    let confirm_password = match opts {
+        Encrypt { .. } => true,
+        Decrypt { .. } | Clean { .. } => false,
+    };
     let init_key = get_password(confirm_password)?;
 
     // TODO do an initial scan to get file count and size count to get an approxdmate duration?

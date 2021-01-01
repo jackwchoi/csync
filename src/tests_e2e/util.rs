@@ -109,13 +109,14 @@ macro_rules! check_core {
         $exit_code_expected:expr,
         $key_1:expr,
         $key_2:expr,
+        $subcommand:literal, 
         $( $arg:expr ),+
     ) => {{
         // `std::process::Output` resulting from the child proc
         let output = {
             // concat args  to spawn a child process
             let mut proc = {
-                let command: String = vec!["cargo run --", $( $arg ),+]
+                let command: String = vec!["cargo run --", $subcommand, $( $arg ),+]
                     .into_iter()
                     .intersperse(" ")
                     .collect();
@@ -164,7 +165,7 @@ macro_rules! check_encrypt {
         let out_dir_hash_before = hash_tree(&out_dir);
 
         //
-        let output = check_core!($exit_code_expected, $key_1, $key_2, $( $arg ),+);
+        let output = check_core!($exit_code_expected, $key_1, $key_2, "encrypt", $( $arg ),+);
 
         // exit code of the process
         match output.status.code().unwrap() {
@@ -242,7 +243,7 @@ macro_rules! check_decrypt {
         let out_dir_hash_before = hash_tree(&out_dir);
 
         //
-        let output = check_core!($exit_code_expected, $key_1, $key_2, $( $arg ),+);
+        let output = check_core!($exit_code_expected, $key_1, $key_2, "decrypt", $( $arg ),+);
 
         //
         match output.status.code().unwrap() {
