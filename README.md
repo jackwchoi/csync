@@ -4,74 +4,11 @@
 [![Colmac documentation](https://docs.rs/colmac/badge.svg)](https://docs.rs/colmac)
 -->
 
-__UNSTABLE; DO NOT USE FOR IMPORTANT APPLICATIONS__
-
 CryptSync (`csync`) is a tool designed to efficiently compress and encrypt a large set of files.
-
-## Table of Contents
-
-1. [CryptSync](#cryptsync)
-    1. [Summary of `csync`](#summary-of-csync)
-    1. [Motivation](#motivation)
-    1. [Performance / Memory Usage](#performance--memory-usage)
-        1. [TLDR](#tldr)
-        1. [Asymptotic Properties](#asymptotic-properties)
-    1. [Example](#example)
-    1. [Installing](#installing)
 
 ## Summary of `csync`
 
 ```txt
-csync 0.1.0
-Jack <jackwchoi@pm.me>
-Crypt-Sync (`csync`) creates a compressed and encrypted archive which can be incrementally updated, meaning that on
-successive runs `csync` will only sync the files that have changed since the last sync.
-
-`csync` uses the following default configurations which can be customized
-
-TODO change Random salt:                  (4096-bit) Spread depth:                  (3) Authentication algorithm:
-HMAC-SHA512 (_) Compression algorithm:        Zstandard (level-3) Encryption algorithm:         ChaCha20 (4096-bit salt)
-Key-derivation algorithm:           Scrypt (log_n: 21, r: 8, p: 1, 4096-bit output, 4096-bit salt)
-
-Project home page: `https://github.com/jackwchoi/csync`
-
-USAGE:
-    csync [FLAGS] [OPTIONS] <source> --outdir <out_dir>
-
-FLAGS:
-        --clean      Clean the csync directory, making it as compact as possible and TODO: TRUNCATING
-    -d, --decrypt    Decrypt an existing csync directory.
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-    -v, --verbose    Print information like step-by-step reporting and timing informations.
-
-OPTIONS:
-        --auth <auth_opt>
-            The authentication algorithm to use; supported algorithms are: `hmac-sha512`
-
-        --cipher <cipher_opt>
-            The encryption algorithm to use; supported algorithms are: `aes256cbc`
-
-        --compressor <compressor_opt>
-            The compression algorithm to use; supported algorithms are: `zstd`
-
-    -o, --outdir <out_dir>
-            The csync directory to be created. If a directory exists under this path, a csync directory will be created
-            with a basename identical name as the source directory. If a directory does not exist under this path, one
-            will be created.
-        --pbkdf2-algorithm <pbkdf2_alg_opt>            supported options are `hmac-sha512`
-    -n, --pbkdf2-num-iter <pbkdf2_num_iter_opt>
-        --pbkdf2-time <pbkdf2_time_to_hash_opt>
-        --salt-len <salt_len_opt>                      Salt length in bytes.
-        --scrypt-log-n <scrypt_log_n_opt>
-        --scrypt-output-len <scrypt_output_len_opt>
-        --scrypt-p <scrypt_p_opt>
-        --scrypt-r <scrypt_r_opt>
-        --scrypt-time <scrypt_time_to_hash_opt>
-    -s, --spread-depth <spread_depth_opt>              TODO
-
-ARGS:
-    <source>    The source directory to csync.
 ```
 
 ### Configurability
