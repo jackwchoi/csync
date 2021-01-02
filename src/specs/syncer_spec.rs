@@ -23,6 +23,8 @@ pub enum SyncerSpec {
         init_salt: CryptoSecureBytes,
         spread_depth: SpreadDepth,
         verbose: bool,
+        //
+        salt_len: u16,
     },
     Decrypt {
         //
@@ -37,6 +39,8 @@ pub enum SyncerSpec {
         init_salt: CryptoSecureBytes,
         spread_depth: SpreadDepth,
         verbose: bool,
+        //
+        salt_len: u16,
     },
     Clean {
         source: PathBuf,
@@ -59,6 +63,7 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                 source,
                 spread_depth_opt,
                 verbose,
+                salt_len,
             } => {
                 let key_deriv_spec = KeyDerivSpec::try_from(kd_spec_ext)?;
 
@@ -66,12 +71,13 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                     authenticator_spec: auth_spec.clone(),
                     cipher_spec: cipher_spec.clone(),
                     compressor_spec: compressor_spec.clone(),
-                    init_salt: CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0),
+                    init_salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
                     key_deriv_spec,
                     out_dir: out_dir.canonicalize()?,
                     source: source.canonicalize()?,
                     spread_depth: spread_depth_opt.clone(),
                     verbose: *verbose,
+                    salt_len: *salt_len,
                 })
             }
             SyncerSpecExt::Decrypt { .. } | SyncerSpecExt::Clean { .. } => {

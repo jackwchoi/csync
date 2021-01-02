@@ -1,4 +1,4 @@
-use crate::{prelude::*, secure_vec::*, specs::key_deriv_spec_ext::*, util::*};
+use crate::{prelude::*, secure_vec::*, specs::key_deriv_spec_ext::*};
 use ring::pbkdf2;
 use scrypt::ScryptParams;
 use serde::{Deserialize, Serialize};
@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 // 1. `$hasher`: &SecureVec<u8> -> &CryptoSecureBytes -> _
 // 1. `$time_handles`:
 macro_rules! determine_params {
-    ( $time_to_hash:expr, $hasher:expr, $time_handler:expr ) => {{
-        let random_key = rng!(DEFAULT_SALT_LEN);
-        let random_salt = rng!(DEFAULT_SALT_LEN);
+    ( $time_to_hash:expr, $salt_len:expr, $hasher:expr, $time_handler:expr ) => {{
+        let random_key = rng!($salt_len as usize);
+        let random_salt = rng!($salt_len as usize);
 
         let average_time_nanos = {
             const SAMPLE_SIZE: u128 = 8;
@@ -37,7 +37,7 @@ macro_rules! determine_params {
 //
 // Parameters for `scrypt` such that running `scrypt` with them will take anywhere between
 // `time_to_hash` and `2 * time_to_hash` number of seconds on this machine, approximately.
-fn determine_scrypt_params(time_to_hash: u16) -> CsyncResult<(ScryptLogN, ScryptR, ScryptP)> {
+fn determine_scrypt_params(time_to_hash: u16, salt_len: u16) -> CsyncResult<(ScryptLogN, ScryptR, ScryptP)> {
     //
     const LOG_N: u8 = DEFAULT_SCRYPT_LOG_N - 4;
     const R: u32 = DEFAULT_SCRYPT_R;
@@ -46,6 +46,7 @@ fn determine_scrypt_params(time_to_hash: u16) -> CsyncResult<(ScryptLogN, Scrypt
 
     determine_params!(
         time_to_hash,
+        salt_len,
         |random_key, random_salt| scrypt!(random_key, random_salt, scrypt_params, DEFAULT_SCRYPT_OUTPUT_LEN),
         |average_time_nanos: f64| {
             let target_as_nanos = time_to_hash as f64 * 1e9;
@@ -65,12 +66,13 @@ fn determine_scrypt_params(time_to_hash: u16) -> CsyncResult<(ScryptLogN, Scrypt
 // # Parameters
 //
 //
-fn determine_pbkdf2_num_iter(alg: pbkdf2::Algorithm, time_to_hash: u16) -> u32 {
+fn determine_pbkdf2_num_iter(alg: pbkdf2::Algorithm, time_to_hash: u16, salt_len: u16) -> u32 {
     //
     const INITIAL_NUM_ITER: u32 = 1 << 14;
 
     determine_params!(
         time_to_hash,
+        salt_len,
         |random_key, random_salt| pbkdf2!(alg, INITIAL_NUM_ITER, random_key, random_salt),
         |average_time_nanos: f64| {
             //
@@ -129,13 +131,14 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                 alg_opt,
                 num_iter_opt,
                 time_opt,
+                salt_len,
             } => {
                 macro_rules! pbkdf2_spec {
                     ( $num_iter:expr ) => {
                         KeyDerivSpec::Pbkdf2 {
                             alg: alg_opt.clone().unwrap_or(Default::default()),
                             num_iter: $num_iter,
-                            salt: CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0),
+                            salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
                         }
                     };
                 }
@@ -144,7 +147,7 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                     (None, time_opt) => {
                         let time = time_opt.unwrap_or(DEFAULT_TIME_TO_HASH);
                         let alg = alg_opt.unwrap_or(Default::default());
-                        pbkdf2_spec!(determine_pbkdf2_num_iter(alg.ring(), time))
+                        pbkdf2_spec!(determine_pbkdf2_num_iter(alg.ring(), time, *salt_len))
                     }
                     _ => csync_err!(HashSpecConflict)?,
                 }
@@ -155,11 +158,12 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                 p_opt,
                 time_opt,
                 output_len_opt,
+                salt_len,
             } => {
                 let (log_n, r, p) = match (log_n_opt, r_opt, p_opt, time_opt) {
                     (None, None, None, time_opt) => {
                         let time = time_opt.unwrap_or(DEFAULT_TIME_TO_HASH);
-                        let (log_n, r, p) = determine_scrypt_params(time)?;
+                        let (log_n, r, p) = determine_scrypt_params(time, *salt_len)?;
                         (log_n.0, r.0, p.0)
                     }
                     (log_n_opt, r_opt, p_opt, None) => (
@@ -174,7 +178,7 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                     p,
                     r,
                     output_len: output_len_opt.unwrap_or(DEFAULT_SCRYPT_OUTPUT_LEN),
-                    salt: CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0),
+                    salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
                 }
             }
         })

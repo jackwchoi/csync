@@ -32,6 +32,7 @@ impl<'a> Action<'a> {
     /// SALTS IN ENCRYPTION CONFIG WILL BE OVERWRTTEN
     pub fn new(
         syncer_spec: &'a SyncerSpec,
+        salt_len: u16,
         src: &Path,
         dest: &Path,
         file_type: FileType,
@@ -47,7 +48,7 @@ impl<'a> Action<'a> {
         macro_rules! action {
             ( $cipher_spec:expr, $unix_mode:expr, $key_hash:expr ) => {
                 Ok(Action {
-                    action_spec: ActionSpec::new(&$cipher_spec.resalt(), $unix_mode, $key_hash)?,
+                    action_spec: ActionSpec::new(&$cipher_spec.resalt(salt_len), salt_len, $unix_mode, $key_hash)?,
                     dest: dest.to_path_buf(),
                     file_type,
                     src: src.to_path_buf(),

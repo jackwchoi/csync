@@ -56,6 +56,7 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
             init_salt,
             spread_depth,
             verbose,
+            ..
         }
         | SyncerSpec::Decrypt {
             authenticator_spec,
@@ -67,6 +68,7 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
             init_salt,
             spread_depth,
             verbose,
+            ..
         } if *verbose => {
             let action_desc = format!("\n{}ing: {:?} -> {:?}\n\n", action, source, out_dir);
             let salt_desc = format_body!("Random salt", ("", format!("{}-bit", bit_len!(init_salt))));

@@ -16,6 +16,7 @@ pub enum KeyDerivSpecExt {
         alg_opt: Option<Pbkdf2Algorithm>,
         num_iter_opt: Option<u32>,
         time_opt: Option<u16>,
+        salt_len: u16,
     },
     Scrypt {
         log_n_opt: Option<u8>,
@@ -23,6 +24,7 @@ pub enum KeyDerivSpecExt {
         p_opt: Option<u32>,
         time_opt: Option<u16>,
         output_len_opt: Option<usize>,
+        salt_len: u16,
     },
 }
 

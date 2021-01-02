@@ -21,14 +21,14 @@ impl ActionSpec {
     /// 1. `cipher_spec`:
     /// 1. `unix_mode`:
     /// 1. `key_hash`:
-    pub fn new(cipher_spec: &CipherSpec, unix_mode: Option<u32>, key_hash: &DerivedKey) -> CsyncResult<Self> {
+    pub fn new(cipher_spec: &CipherSpec, salt_len: u16, unix_mode: Option<u32>, key_hash: &DerivedKey) -> CsyncResult<Self> {
         // rehash the key hash
         let rehash_spec: RehashSpec = RehashSpec::with_key_deriv_spec(KeyDerivSpec::Scrypt {
             log_n: 12,
             r: 8,
             p: 1,
-            salt: CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0),
-            output_len: DEFAULT_SALT_LEN,
+            salt: CryptoSecureBytes(rng!(salt_len as usize).0),
+            output_len: salt_len as usize,
         });
         let rehash = rehash_spec.rehash(key_hash)?;
 

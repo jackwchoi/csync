@@ -1,4 +1,4 @@
-use crate::{prelude::*, secure_vec::*};
+use crate::secure_vec::*;
 use serde::{Deserialize, Serialize};
 
 ///
@@ -9,18 +9,22 @@ pub enum CipherSpec {
 }
 
 macro_rules! rand_salt {
-    () => {
-        CryptoSecureBytes(rng!(DEFAULT_SALT_LEN).0)
+    ( $salt_len:expr ) => {
+        CryptoSecureBytes(rng!($salt_len as usize).0)
     };
 }
 
 ///
 impl CipherSpec {
     ///
-    pub fn resalt(&self) -> Self {
+    pub fn resalt(&self, salt_len: u16) -> Self {
         match self {
-            Self::Aes256Cbc { .. } => Self::Aes256Cbc { init_vec: rand_salt!() },
-            Self::ChaCha20 { .. } => Self::ChaCha20 { init_vec: rand_salt!() },
+            Self::Aes256Cbc { .. } => Self::Aes256Cbc {
+                init_vec: rand_salt!(salt_len),
+            },
+            Self::ChaCha20 { .. } => Self::ChaCha20 {
+                init_vec: rand_salt!(salt_len),
+            },
         }
     }
 }

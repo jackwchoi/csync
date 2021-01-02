@@ -21,6 +21,8 @@ pub enum SyncerSpecExt {
         //
         spread_depth_opt: SpreadDepth,
         verbose: bool,
+        //
+        salt_len: u16,
     },
     Decrypt {
         out_dir: PathBuf,
@@ -92,7 +94,6 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                         false => csync_err!(InvalidSpreadDepth, *n)?,
                     },
                 };
-                let salt_len = *salt_len as usize;
 
                 let kd_spec_ext = extract_kd_opt(&opts)?;
 
@@ -102,10 +103,10 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                 };
                 let cipher_spec = match cipher.as_str() {
                     "aes256cbc" => CipherSpec::Aes256Cbc {
-                        init_vec: CryptoSecureBytes(rng!(salt_len).0),
+                        init_vec: CryptoSecureBytes(rng!(*salt_len as usize).0),
                     },
                     "chacha20" => CipherSpec::ChaCha20 {
-                        init_vec: CryptoSecureBytes(rng!(salt_len).0),
+                        init_vec: CryptoSecureBytes(rng!(*salt_len as usize).0),
                     },
                     _ => todo!(),
                 };
@@ -125,6 +126,7 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                     out_dir: out_dir.to_path_buf(),
                     source: source.to_path_buf(),
                     verbose: *verbose,
+                    salt_len: *salt_len,
                 }
             }
             Opts::Decrypt {
@@ -159,6 +161,7 @@ fn extract_kd_opt(opts: &Opts) -> CsyncResult<KeyDerivSpecExt> {
             scrypt_r_opt,
             scrypt_time_to_hash_opt,
             scrypt_output_len_opt,
+            salt_len,
             ..
         } => {
             match (
@@ -178,7 +181,7 @@ fn extract_kd_opt(opts: &Opts) -> CsyncResult<KeyDerivSpecExt> {
                     p_opt: None,
                     time_opt: None,
                     output_len_opt: None,
-                    // TODO salt len
+                    salt_len: *salt_len,
                 }),
                 // pbkdf2
                 (alg_opt, time_to_hash, num_iter_opt, None, None, None, None, None) => {
@@ -192,6 +195,7 @@ fn extract_kd_opt(opts: &Opts) -> CsyncResult<KeyDerivSpecExt> {
                                 }),
                                 num_iter_opt: $num_iter_opt,
                                 time_opt: $time_opt,
+                                salt_len: *salt_len,
                             })
                         };
                     }
@@ -213,6 +217,7 @@ fn extract_kd_opt(opts: &Opts) -> CsyncResult<KeyDerivSpecExt> {
                                 p_opt: $p_opt,
                                 time_opt: $time_opt,
                                 output_len_opt: $output_len_opt,
+                                salt_len: *salt_len,
                             })
                         };
                     }

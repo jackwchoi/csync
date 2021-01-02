@@ -145,6 +145,7 @@ impl Syncer {
                                     init_salt,
                                     spread_depth,
                                     verbose,
+                                    salt_len,
                                     ..
                                 } => {
                                     std::fs::create_dir_all($out_dir)?;
@@ -159,6 +160,7 @@ impl Syncer {
                                             init_salt,
                                             spread_depth,
                                             verbose,
+                                            salt_len,
                                         },
                                         init_key.clone(),
                                         Some(derived_key),
@@ -329,6 +331,7 @@ impl Syncer {
                 out_dir,
                 spread_depth,
                 init_salt,
+                salt_len,
                 ..
             } => {
                 self.check_rep();
@@ -359,6 +362,7 @@ impl Syncer {
                             ( $dest:expr ) => {
                                 Some(Action::new(
                                     &self.spec,
+                                    *salt_len,
                                     &src_pbuf.to_path_buf(),
                                     $dest,
                                     file_type,
@@ -413,6 +417,7 @@ impl Syncer {
                 source,
                 out_dir,
                 spread_depth,
+                salt_len,
                 ..
             } => {
                 self.check_rep();
@@ -437,6 +442,7 @@ impl Syncer {
                             cipherpath_to_path(spread_depth.clone(), source, &cipherpath, &self.derived_key)?;
                         Action::new(
                             &self.spec,
+                            *salt_len,
                             &cipherpath,
                             &out_dir.join(path),
                             file_type,

@@ -1,4 +1,3 @@
-use crate::prelude::DEFAULT_SALT_LEN_STR;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -70,8 +69,8 @@ pub enum Opts {
         scrypt_output_len_opt: Option<usize>,
 
         /// Use salts that are this many bytes long.
-        #[structopt(long, default_value=DEFAULT_SALT_LEN_STR)]
-        salt_len: u32,
+        #[structopt(long, default_value = "512")]
+        salt_len: u16,
 
         /// The source directory to csync.
         #[structopt(parse(from_os_str))]
