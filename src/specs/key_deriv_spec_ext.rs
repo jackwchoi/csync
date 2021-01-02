@@ -23,7 +23,7 @@ pub enum KeyDerivSpecExt {
         r_opt: Option<u32>,
         p_opt: Option<u32>,
         time_opt: Option<u16>,
-        output_len_opt: Option<usize>,
+        output_len: usize,
         salt_len: u16,
     },
 }

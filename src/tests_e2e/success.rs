@@ -156,6 +156,7 @@ generate_mod!(
     "H7u1ZPOHnzMVXyVT6vBSnkIe6TMTj5otNQGi2wmIW4lJw36sBccg8PCm5AKX8iMX",
     "--cipher aes256cbc",
     "--spread-depth 4",
+    "--key-deriv-alg pbkdf2",
     "--pbkdf2-num-iter 89432"
 );
 
@@ -166,8 +167,9 @@ generate_mod!(
     "H7u1ZPOHnzMVXyVT6vBSnkIe6TMTj5otNQGi2wmIW4lJw36sBccg8PCm5AKX8iMX",
     "--cipher aes256cbc",
     "--spread-depth 5",
+    "--key-deriv-alg pbkdf2",
     "--pbkdf2-alg hmac-sha512",
-    "--pbkdf2-time 4"
+    "--key-deriv-time 4"
 );
 
 generate_mod!(
@@ -175,7 +177,7 @@ generate_mod!(
     "H7u1ZPOHnzMVXyVT6vBSnkIe6TMTj5otNQGi2wmIW4lJw36sBccg8PCm5AKX8iMX",
     "--cipher chacha20",
     "--spread-depth 6",
-    "--scrypt-time 3",
+    "--key-deriv-time 3",
     "--scrypt-output-len 1483"
 );
 

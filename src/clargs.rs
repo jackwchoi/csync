@@ -41,34 +41,34 @@ pub enum Opts {
         #[structopt(short, long, parse(from_os_str))]
         out_dir: PathBuf,
 
-        // #[structopt(short, long="key-deriv-alg")]
+        /// supported options are `scrypt`, `pbkdf2`
+        #[structopt(short, long, default_value = "scrypt")]
+        key_deriv_alg: String,
+        #[structopt(long, default_value = "4")]
+        key_deriv_time: u16,
+        ///
+        #[structopt(long)]
+        key_deriv_by_params: bool,
 
         /// Use this algorithm within `pbkdf2`; supported options are `hmac-sha512`.
-        /// Defaults to `hmac-sha512`.
-        #[structopt(long = "pbkdf2-alg")]
-        pbkdf2_alg_opt: Option<String>,
+        #[structopt(long = "pbkdf2-alg", default_value = "hmac-sha512")]
+        pbkdf2_alg: String,
         ///
-        #[structopt(long = "pbkdf2-num-iter")]
-        pbkdf2_num_iter_opt: Option<u32>,
-        ///
-        #[structopt(long = "pbkdf2-time")]
-        pbkdf2_time_to_hash_opt: Option<u16>,
+        #[structopt(long = "pbkdf2-num-iter", default_value = "100000")]
+        pbkdf2_num_iter: u32,
 
-        ///
-        #[structopt(long = "scrypt-time")]
-        scrypt_time_to_hash_opt: Option<u16>,
         /// Use this as the `log_2(n)` parameter for `scrypt`.
-        #[structopt(long = "scrypt-log-n")]
-        scrypt_log_n_opt: Option<u8>,
+        #[structopt(long, default_value = "15")]
+        scrypt_log_n: u8,
         /// Use this as the `r` parameter for `scrypt`.
-        #[structopt(long = "scrypt-r")]
-        scrypt_r_opt: Option<u32>,
+        #[structopt(long, default_value = "8")]
+        scrypt_r: u32,
         /// Use this as the `p` parameter for `scrypt`.
-        #[structopt(long = "scrypt-p")]
-        scrypt_p_opt: Option<u32>,
+        #[structopt(long, default_value = "1")]
+        scrypt_p: u32,
         ///
-        #[structopt(long = "scrypt-output-len")]
-        scrypt_output_len_opt: Option<usize>,
+        #[structopt(long, default_value = "512")]
+        scrypt_output_len: usize,
 
         /// Use salts that are this many bytes long.
         #[structopt(long, default_value = "512")]

@@ -157,7 +157,7 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                 r_opt,
                 p_opt,
                 time_opt,
-                output_len_opt,
+                output_len,
                 salt_len,
             } => {
                 let (log_n, r, p) = match (log_n_opt, r_opt, p_opt, time_opt) {
@@ -177,7 +177,7 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                     log_n,
                     p,
                     r,
-                    output_len: output_len_opt.unwrap_or(DEFAULT_SCRYPT_OUTPUT_LEN),
+                    output_len: *output_len,
                     salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
                 }
             }
