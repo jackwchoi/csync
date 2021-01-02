@@ -164,56 +164,54 @@ fn extract_kd_opt(opts: &Opts) -> CsyncResult<KeyDerivSpecExt> {
             scrypt_output_len,
             salt_len,
             ..
-        } => {
-            match key_deriv_alg.as_ref() {
-                "scrypt" => {
-                    macro_rules! t {
-                        ( $log_n_opt:expr, $r_opt:expr, $p_opt:expr, $time_opt:expr, $output_len:expr ) => {
-                            Ok(KeyDerivSpecExt::Scrypt {
-                                log_n_opt: $log_n_opt,
-                                r_opt: $r_opt,
-                                p_opt: $p_opt,
-                                time_opt: $time_opt,
-                                output_len: $output_len,
-                                salt_len: *salt_len,
-                            })
-                        };
-                    }
-
-                    match key_deriv_by_params {
-                        true => t!(
-                            Some(*scrypt_log_n),
-                            Some(*scrypt_r),
-                            Some(*scrypt_p),
-                            None,
-                            *scrypt_output_len
-                        ),
-                        false => t!(None, None, None, Some(*key_deriv_time), *scrypt_output_len),
-                    }
+        } => match key_deriv_alg.as_ref() {
+            "scrypt" => {
+                macro_rules! t {
+                    ( $log_n_opt:expr, $r_opt:expr, $p_opt:expr, $time_opt:expr, $output_len:expr ) => {
+                        Ok(KeyDerivSpecExt::Scrypt {
+                            log_n_opt: $log_n_opt,
+                            r_opt: $r_opt,
+                            p_opt: $p_opt,
+                            time_opt: $time_opt,
+                            output_len: $output_len,
+                            salt_len: *salt_len,
+                        })
+                    };
                 }
-                "pbkdf2" => {
-                    macro_rules! t {
-                        ( $num_iter_opt:expr, $time_opt:expr ) => {
-                            Ok(KeyDerivSpecExt::Pbkdf2 {
-                                alg_opt: Some(match pbkdf2_alg.as_ref() {
-                                    "hmac-sha512" => Pbkdf2Algorithm::HmacSha512,
-                                    _ => todo!(),
-                                }),
-                                num_iter_opt: $num_iter_opt,
-                                time_opt: $time_opt,
-                                salt_len: *salt_len,
-                            })
-                        };
-                    }
 
-                    match key_deriv_by_params {
-                        true => t!(Some(*pbkdf2_num_iter), None),
-                        false => t!(None, Some(*key_deriv_time)),
-                    }
+                match key_deriv_by_params {
+                    true => t!(
+                        Some(*scrypt_log_n),
+                        Some(*scrypt_r),
+                        Some(*scrypt_p),
+                        None,
+                        *scrypt_output_len
+                    ),
+                    false => t!(None, None, None, Some(*key_deriv_time), *scrypt_output_len),
                 }
-                _ => todo!(),
             }
-        }
+            "pbkdf2" => {
+                macro_rules! t {
+                    ( $num_iter_opt:expr, $time_opt:expr ) => {
+                        Ok(KeyDerivSpecExt::Pbkdf2 {
+                            alg_opt: Some(match pbkdf2_alg.as_ref() {
+                                "hmac-sha512" => Pbkdf2Algorithm::HmacSha512,
+                                _ => todo!(),
+                            }),
+                            num_iter_opt: $num_iter_opt,
+                            time_opt: $time_opt,
+                            salt_len: *salt_len,
+                        })
+                    };
+                }
+
+                match key_deriv_by_params {
+                    true => t!(Some(*pbkdf2_num_iter), None),
+                    false => t!(None, Some(*key_deriv_time)),
+                }
+            }
+            _ => todo!(),
+        },
         Opts::Decrypt { .. } | Opts::Clean { .. } => panic!(),
     }
 }

@@ -161,16 +161,11 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                 salt_len,
             } => {
                 let (log_n, r, p) = match (log_n_opt, r_opt, p_opt, time_opt) {
-                    (None, None, None, time_opt) => {
-                        let time = time_opt.unwrap_or(DEFAULT_TIME_TO_HASH);
-                        let (log_n, r, p) = determine_scrypt_params(time, *salt_len)?;
+                    (None, None, None, Some(time)) => {
+                        let (log_n, r, p) = determine_scrypt_params(*time, *salt_len)?;
                         (log_n.0, r.0, p.0)
                     }
-                    (log_n_opt, r_opt, p_opt, None) => (
-                        log_n_opt.unwrap_or(DEFAULT_SCRYPT_LOG_N),
-                        r_opt.unwrap_or(DEFAULT_SCRYPT_R),
-                        p_opt.unwrap_or(DEFAULT_SCRYPT_P),
-                    ),
+                    (Some(log_n), Some(r), Some(p), None) => (*log_n, *r, *p),
                     _ => csync_err!(HashSpecConflict)?,
                 };
                 KeyDerivSpec::Scrypt {

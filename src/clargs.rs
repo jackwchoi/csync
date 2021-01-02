@@ -54,7 +54,7 @@ pub enum Opts {
         #[structopt(long = "pbkdf2-alg", default_value = "hmac-sha512")]
         pbkdf2_alg: String,
         ///
-        #[structopt(long = "pbkdf2-num-iter", default_value = "100000")]
+        #[structopt(long = "pbkdf2-num-iter", default_value = "131072")]
         pbkdf2_num_iter: u32,
 
         /// Use this as the `log_2(n)` parameter for `scrypt`.
