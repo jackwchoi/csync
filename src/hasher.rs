@@ -43,49 +43,18 @@ macro_rules! pbkdf2 {
 /// for more info on the retrun type.
 macro_rules! scrypt {
     //
-    ( $key:expr ) => {
-        scrypt!(impl $key, None, None, None)
-    };
-    //
-    ( $key:expr, $salt:expr ) => {
-        scrypt!(impl $key, Some($salt), None, None)
-    };
-    //
-    ( $key:expr, $salt:expr, $params:expr ) => {
-        scrypt!(impl $key, Some($salt), Some($params), None)
-    };
-    //
     ( $key:expr, $salt:expr, $params:expr, $output_len:expr ) => {
-        scrypt!(impl $key, Some($salt), Some($params), Some($output_len))
-    };
-    //
-    ( impl $key:expr, $salt_opt:expr, $params_opt:expr, $output_len_opt:expr ) => {
-        crate::hasher::scrypt_custom($params_opt, $output_len_opt, $salt_opt, $key)
+        crate::hasher::scrypt_custom($params, $output_len, $salt, $key)
     };
 }
 
 /// output_len_opt must be less than
 pub fn scrypt_custom(
-    params_opt: Option<ScryptParams>,
-    output_len_opt: Option<usize>,
-    salt_opt: Option<&CryptoSecureBytes>,
+    params: ScryptParams,
+    output_len: usize,
+    salt: &CryptoSecureBytes,
     key: &SecureBytes,
 ) -> CsyncResult<CryptoSecureBytes> {
-    //
-    let salt = match salt_opt {
-        Some(s) => s.clone(),
-        None => CryptoSecureBytes(DEFAULT_SALT.to_vec().into()),
-    };
-    //
-    let params = params_opt.unwrap_or({
-        let log_n = 15;
-        let r = 8;
-        let p = 1;
-        ScryptParams::new(log_n, r, p)?
-    });
-
-    let output_len = output_len_opt.unwrap_or(DEFAULT_SCRYPT_OUTPUT_LEN);
-
     let mut buffer = vec![0u8; output_len];
     scrypt(key.unsecure(), salt.0.unsecure(), &params, &mut buffer[..])?;
 

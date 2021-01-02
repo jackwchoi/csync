@@ -37,17 +37,17 @@ macro_rules! determine_params {
 //
 // Parameters for `scrypt` such that running `scrypt` with them will take anywhere between
 // `time_to_hash` and `2 * time_to_hash` number of seconds on this machine, approximately.
-fn determine_scrypt_params(time_to_hash: u16, salt_len: u16) -> CsyncResult<(ScryptLogN, ScryptR, ScryptP)> {
+fn determine_scrypt_params(time_to_hash: u16, salt_len: u16, output_len: usize) -> CsyncResult<(ScryptLogN, ScryptR, ScryptP)> {
     //
-    const LOG_N: u8 = DEFAULT_SCRYPT_LOG_N - 4;
-    const R: u32 = DEFAULT_SCRYPT_R;
-    const P: u32 = DEFAULT_SCRYPT_P;
+    const LOG_N: u8 = 12;
+    const R: u32 = 8;
+    const P: u32 = 1;
     let scrypt_params = ScryptParams::new(LOG_N, R, P)?;
 
     determine_params!(
         time_to_hash,
         salt_len,
-        |random_key, random_salt| scrypt!(random_key, random_salt, scrypt_params, DEFAULT_SCRYPT_OUTPUT_LEN),
+        |random_key, random_salt| scrypt!(random_key, random_salt, scrypt_params, output_len),
         |average_time_nanos: f64| {
             let target_as_nanos = time_to_hash as f64 * 1e9;
             let factor = match (target_as_nanos / average_time_nanos).log2().ceil() {
@@ -150,7 +150,7 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
                 output_len,
                 salt_len,
             } => {
-                let (log_n, r, p) = determine_scrypt_params(*time, *salt_len)?;
+                let (log_n, r, p) = determine_scrypt_params(*time, *salt_len, *output_len)?;
                 //
                 KeyDerivSpec::Scrypt {
                     log_n: log_n.0,
