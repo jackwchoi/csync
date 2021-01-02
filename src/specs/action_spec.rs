@@ -28,7 +28,7 @@ impl ActionSpec {
             r: 8,
             p: 1,
             salt: CryptoSecureBytes(rng!(salt_len as usize).0),
-            output_len: salt_len as usize,
+            output_len: salt_len as usize, // TODO pass output len as param
         });
         let rehash = rehash_spec.rehash(key_hash)?;
 

@@ -166,7 +166,7 @@ generate_mod!(
     "H7u1ZPOHnzMVXyVT6vBSnkIe6TMTj5otNQGi2wmIW4lJw36sBccg8PCm5AKX8iMX",
     "--cipher aes256cbc",
     "--spread-depth 5",
-    "--pbkdf2-algorithm hmac-sha512",
+    "--pbkdf2-alg hmac-sha512",
     "--pbkdf2-time 4"
 );
 

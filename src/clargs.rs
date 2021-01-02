@@ -41,9 +41,11 @@ pub enum Opts {
         #[structopt(short, long, parse(from_os_str))]
         out_dir: PathBuf,
 
+        // #[structopt(short, long="key-deriv-alg")]
+
         /// Use this algorithm within `pbkdf2`; supported options are `hmac-sha512`.
         /// Defaults to `hmac-sha512`.
-        #[structopt(long = "pbkdf2-algorithm")]
+        #[structopt(long = "pbkdf2-alg")]
         pbkdf2_alg_opt: Option<String>,
         ///
         #[structopt(long = "pbkdf2-num-iter")]
