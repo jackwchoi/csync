@@ -127,55 +127,52 @@ impl std::convert::TryFrom<&KeyDerivSpecExt> for KeyDerivSpec {
     //
     fn try_from(spec_ext: &KeyDerivSpecExt) -> Result<Self, Self::Error> {
         Ok(match spec_ext {
-            KeyDerivSpecExt::Pbkdf2 {
-                alg_opt,
-                num_iter_opt,
-                time_opt,
-                salt_len,
-            } => {
-                macro_rules! pbkdf2_spec {
-                    ( $num_iter:expr ) => {
-                        KeyDerivSpec::Pbkdf2 {
-                            alg: alg_opt.clone().unwrap_or(Default::default()),
-                            num_iter: $num_iter,
-                            salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
-                        }
-                    };
-                }
-                match (num_iter_opt, time_opt) {
-                    (Some(num_iter), None) => pbkdf2_spec!(*num_iter),
-                    (None, time_opt) => {
-                        let time = time_opt.unwrap_or(DEFAULT_TIME_TO_HASH);
-                        let alg = alg_opt.unwrap_or(Default::default());
-                        pbkdf2_spec!(determine_pbkdf2_num_iter(alg.ring(), time, *salt_len))
-                    }
-                    _ => csync_err!(HashSpecConflict)?,
+            KeyDerivSpecExt::Pbkdf2ByTime { alg_opt, time, salt_len } => {
+                let alg = alg_opt.unwrap_or(Default::default());
+                let num_iter = determine_pbkdf2_num_iter(alg.ring(), *time, *salt_len);
+                KeyDerivSpec::Pbkdf2 {
+                    alg,
+                    num_iter,
+                    salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
                 }
             }
-            KeyDerivSpecExt::Scrypt {
-                log_n_opt,
-                r_opt,
-                p_opt,
-                time_opt,
+            KeyDerivSpecExt::Pbkdf2ByParams {
+                alg_opt,
+                num_iter,
+                salt_len,
+            } => KeyDerivSpec::Pbkdf2 {
+                alg: alg_opt.clone().unwrap_or(Default::default()),
+                num_iter: *num_iter,
+                salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
+            },
+            KeyDerivSpecExt::ScryptByTime {
+                time,
                 output_len,
                 salt_len,
             } => {
-                let (log_n, r, p) = match (log_n_opt, r_opt, p_opt, time_opt) {
-                    (None, None, None, Some(time)) => {
-                        let (log_n, r, p) = determine_scrypt_params(*time, *salt_len)?;
-                        (log_n.0, r.0, p.0)
-                    }
-                    (Some(log_n), Some(r), Some(p), None) => (*log_n, *r, *p),
-                    _ => csync_err!(HashSpecConflict)?,
-                };
+                let (log_n, r, p) = determine_scrypt_params(*time, *salt_len)?;
+                //
                 KeyDerivSpec::Scrypt {
-                    log_n,
-                    p,
-                    r,
+                    log_n: log_n.0,
+                    p: p.0,
+                    r: r.0,
                     output_len: *output_len,
                     salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
                 }
             }
+            KeyDerivSpecExt::ScryptByParams {
+                log_n,
+                r,
+                p,
+                output_len,
+                salt_len,
+            } => KeyDerivSpec::Scrypt {
+                log_n: *log_n,
+                p: *p,
+                r: *r,
+                output_len: *output_len,
+                salt: CryptoSecureBytes(rng!(*salt_len as usize).0),
+            },
         })
     }
 }

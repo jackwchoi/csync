@@ -12,17 +12,25 @@ pub struct ScryptP(pub u32);
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum KeyDerivSpecExt {
-    Pbkdf2 {
+    Pbkdf2ByTime {
         alg_opt: Option<Pbkdf2Algorithm>,
-        num_iter_opt: Option<u32>,
-        time_opt: Option<u16>,
+        time: u16,
         salt_len: u16,
     },
-    Scrypt {
-        log_n_opt: Option<u8>,
-        r_opt: Option<u32>,
-        p_opt: Option<u32>,
-        time_opt: Option<u16>,
+    Pbkdf2ByParams {
+        alg_opt: Option<Pbkdf2Algorithm>,
+        num_iter: u32,
+        salt_len: u16,
+    },
+    ScryptByTime {
+        time: u16,
+        output_len: usize,
+        salt_len: u16,
+    },
+    ScryptByParams {
+        log_n: u8,
+        r: u32,
+        p: u32,
         output_len: usize,
         salt_len: u16,
     },
