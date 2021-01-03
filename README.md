@@ -7,8 +7,9 @@ CryptSync (`csync`) efficiently compresses and encrypts a large set of files and
 ## Features
 
 1. __SECURITY__
-    1. Supports `AES`, `Chacha20`
-    1. Cryptographically secure pseudo random number generators used
+    1. Supports [`AES`](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard), [`Chacha20`](https://en.wikipedia.org/wiki/Salsa20#ChaCha_variant) and more to come
+    1. Key Derivation algorithms: [`scrypt`](https://en.wikipedia.org/wiki/Scrypt), [`pbkdf2`](https://en.wikipedia.org/wiki/PBKDF2) and more to come
+    1. [Cryptographically Secure Pseudorandom Number Generators](https://rust-random.github.io/rand/rand_chacha/struct.ChaCha20Rng.html)
     1. Secure random salts with configurable-length, for each file, for each session
     1. file names are encrypted
     1. data are compressed and encrypted
