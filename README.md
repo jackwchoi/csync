@@ -4,17 +4,37 @@
   
 CryptSync (`csync`) efficiently compresses and encrypts a large set of files and directories.
 
+## Features
+
+1. __SECURITY__
+    1. Supports `AES`, `Chacha20`
+    1. Cryptographically secure pseudo random number generators used
+    1. Secure random salts with configurable-length, for each file, for each session
+    1. file names are encrypted
+    1. data are compressed and encrypted
+    1. directory structure is obfuscated
+1. __PRIVACY__
+    1. Open Source:
+    1. Client-side: 
+1. __PERFORMANCE__
+    1. fully parallel: designed to utilize 100% of your machine
+    1. 100% Rust
+    1. incremental build
+1. __FUTURE PROOF__
+    1. almost all aspects of `csync` can be customized and configured
+        1. o
+
 ## Motivation
 
-One way to backup a set of files with data compression and encryption is to use an archival tool like `tar`,
-followed by a compressor like `gzip`, followed by an encryption tool like `gpg`, like so:
+One way to compress, encrypt and backup a set of files is to use an archival tool like `tar`, a compressor 
+like `gzip`, then an encryption tool like `gpg`:
 ```bash
 gtar -cf - "$SOURCE" |
     gzip |
     gpg --pinentry-mode=loopback -c - > "$BACKUP_FILE"
 ```
 
-This process has the following benefits:
+This workflow has the following benefits:
 1. it creates one large file that holds the compressed/encrypted data
 
 However it has the following drawbacks:
@@ -23,18 +43,6 @@ However it has the following drawbacks:
     1. if we work with thousands of files and gigabytes of data, we don't want to create it from scratch every time
 1. the user is responsible for choosing the right tools to make it performant
 1. need to know about many different tools and settings
-
-## Features
-
-1. __SECURITY__
-    1. o
-1. __PRIVACY__
-    1. client side
-1. __PERFORMANCE__
-    1. fully parallel: designed to utilize 100% of your machine
-    1. 100% Rust
-1. __FUTURE PROOF__
-    1. almost all aspects of `csync` can be customized
 
 ## Summary of `csync`
 
