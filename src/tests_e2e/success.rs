@@ -37,8 +37,7 @@ fn encrypted_dir_basename_changed() {
         key_1,
         key_2,
         path_as_str!(&source),
-        &format!("-o {}", path_as_str!(&out_dir)),
-        "-v"
+        &format!("-o {}", path_as_str!(&out_dir))
     );
 
     std::fs::rename(&out_dir, &renamed_out_dir).unwrap();
@@ -52,8 +51,7 @@ fn encrypted_dir_basename_changed() {
         key_1,
         key_2,
         path_as_str!(&renamed_out_dir),
-        &format!("-o {}", path_as_str!(&out_out_dir)),
-        "-v"
+        &format!("-o {}", path_as_str!(&out_out_dir))
     );
 }
 
@@ -90,8 +88,7 @@ macro_rules! generate_success_body {
                     key_1,
                     key_2,
                     path_as_str!(source),
-                    &format!("-o {}", path_as_str!(out_dir)),
-                    "-v"
+                    &format!("-o {}", path_as_str!(out_dir))
                     $(, $arg )*
                 );
 
@@ -104,8 +101,7 @@ macro_rules! generate_success_body {
                     key_1,
                     key_2,
                     path_as_str!(out_dir),
-                    &format!("-o {}", path_as_str!(out_out_dir)),
-                    "-v"
+                    &format!("-o {}", path_as_str!(out_out_dir))
                 );
             }
         }

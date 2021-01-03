@@ -23,8 +23,7 @@ fn password_confirmation_fail_during_encryption() {
         key_2,
         "encrypt",
         path_as_str!(&source.path()),
-        &format!("-o {}", path_as_str!(out_dir.path())),
-        "-v"
+        &format!("-o {}", path_as_str!(out_dir.path()))
     );
 
     //
@@ -61,8 +60,7 @@ fn metadata_load_failed() {
         key_1,
         key_2,
         path_as_str!(&out_dir),
-        &format!("-o {}", path_as_str!(out_out_dir)),
-        "-v"
+        &format!("-o {}", path_as_str!(out_out_dir))
     );
 
     //
@@ -101,8 +99,7 @@ fn authentication_fail() {
         key_1,
         key_2,
         path_as_str!(source),
-        &format!("-o {}", path_as_str!(out_dir)),
-        "-v"
+        &format!("-o {}", path_as_str!(out_dir))
     );
 
     // different key from encryption
@@ -118,8 +115,7 @@ fn authentication_fail() {
         key_1,
         key_2,
         path_as_str!(&out_dir),
-        &format!("-o {}", path_as_str!(out_out_dir)),
-        "-v"
+        &format!("-o {}", path_as_str!(out_out_dir))
     );
 
     //
@@ -153,8 +149,7 @@ mod source_does_not_exist {
             key_2,
             "encrypt",
             path_as_str!(&source),
-            &format!("-o {}", path_as_str!(out_dir.path())),
-            "-v"
+            &format!("-o {}", path_as_str!(out_dir.path()))
         );
 
         //
@@ -190,8 +185,7 @@ mod source_does_not_exist {
             key_1,
             key_2,
             path_as_str!(source),
-            &format!("-o {}", path_as_str!(out_dir)),
-            "-v"
+            &format!("-o {}", path_as_str!(out_dir))
         );
 
         let dne_out_dir = tmpdir!().unwrap();
@@ -209,8 +203,7 @@ mod source_does_not_exist {
             key_1,
             key_2,
             path_as_str!(&dne_out_dir),
-            &format!("-o {}", path_as_str!(out_out_dir)),
-            "-v"
+            &format!("-o {}", path_as_str!(out_out_dir))
         );
 
         //
@@ -241,8 +234,7 @@ fn decryption_outdir_is_nonempty() {
         key_1,
         key_2,
         path_as_str!(&source),
-        &format!("-o {}", path_as_str!(out_dir.path())),
-        "-v"
+        &format!("-o {}", path_as_str!(out_dir.path()))
     );
 
     //
@@ -259,8 +251,7 @@ fn decryption_outdir_is_nonempty() {
         key_2,
         "decrypt",
         path_as_str!(out_dir.path()),
-        &format!("-o {}", path_as_str!(out_out_dir.path())),
-        "-v"
+        &format!("-o {}", path_as_str!(out_out_dir.path()))
     );
 }
 
@@ -316,8 +307,7 @@ fn outdir_is_not_dir() {
         key_2,
         "encrypt",
         path_as_str!(&source),
-        &format!("-o {}", path_as_str!(&out_dir)),
-        "-v"
+        &format!("-o {}", path_as_str!(&out_dir))
     );
 }
 
@@ -340,8 +330,7 @@ fn source_eq_outdir() {
         key_2,
         "encrypt",
         path_as_str!(&source.path()),
-        &format!("-o {}", path_as_str!(&source.path())),
-        "-v"
+        &format!("-o {}", path_as_str!(&source.path()))
     );
 }
 
@@ -367,8 +356,7 @@ fn source_does_not_have_filename() {
         key_2,
         "encrypt",
         path_as_str!(&source),
-        &format!("-o {}", path_as_str!(&out_dir.path())),
-        "-v"
+        &format!("-o {}", path_as_str!(&out_dir.path()))
     );
 }
 
@@ -400,8 +388,7 @@ mod incremental_encryption_disabled_for_now {
                     key_2,
                     "encrypt",
                     path_as_str!(&source),
-                    &format!("-o {}", path_as_str!(&out_dir)),
-                    "-v"
+                    &format!("-o {}", path_as_str!(&out_dir))
                 );
             }
         };

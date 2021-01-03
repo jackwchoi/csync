@@ -331,8 +331,7 @@ macro_rules! generate_suite {
                 key_1,
                 key_2,
                 path_as_str!(&source),
-                &format!("-o {}", path_as_str!(out_dir_path)),
-                "-v"
+                &format!("-o {}", path_as_str!(out_dir_path))
             );
 
             (out_dir_path.to_path_buf(), Some(out_dir))

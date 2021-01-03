@@ -40,7 +40,7 @@ pub enum Opts {
         key_deriv_alg: String,
 
         /// Number of seconds the key derivation process should take on this machine. `csync` will
-        /// figure out the approximate parameters
+        /// approximate the parameters of `--key-deriv-alg` in order to meet this requirement.
         #[structopt(long, default_value = "4")]
         key_deriv_time: u16,
 
@@ -90,9 +90,9 @@ pub enum Opts {
         #[structopt(long, default_value = "3")]
         spread_depth: u8,
 
-        /// Print information like step-by-step reporting and timing informations.
+        /// Suppress the printing of information like step-by-step reporting and timing informations.
         #[structopt(short, long)]
-        verbose: bool,
+        quiet: bool,
 
         /// Compression level for `zstd`, allowed range is 1-19.
         #[structopt(long, default_value = DEFAULT_ZSTD_LEVEL_STR)]
@@ -115,9 +115,9 @@ pub enum Opts {
         #[structopt(parse(from_os_str))]
         source: PathBuf,
 
-        /// Print information like step-by-step reporting and timing informations.
+        /// Suppress the printing of information like step-by-step reporting and timing informations.
         #[structopt(short, long)]
-        verbose: bool,
+        quiet: bool,
     },
 
     /// Clean a `csync` directory by making it as compact as possible.
@@ -130,8 +130,8 @@ pub enum Opts {
         #[structopt(parse(from_os_str))]
         source: PathBuf,
 
-        /// Print information like step-by-step reporting and timing informations.
+        /// Suppress the printing of information like step-by-step reporting and timing informations.
         #[structopt(short, long)]
-        verbose: bool,
+        quiet: bool,
     },
 }

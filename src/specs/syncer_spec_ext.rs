@@ -83,7 +83,7 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                 out_dir,
                 source,
                 spread_depth,
-                verbose,
+                quiet,
                 zstd_level,
                 ..
             } => {
@@ -116,24 +116,24 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                     spread_depth: *spread_depth,
                     out_dir: out_dir.to_path_buf(),
                     source: source.to_path_buf(),
-                    verbose: *verbose,
+                    verbose: !*quiet,
                     salt_len: *salt_len,
                 }
             }
             Opts::Decrypt {
                 source,
                 out_dir,
-                verbose,
+                quiet,
                 ..
             } => SyncerSpecExt::Decrypt {
                 out_dir: out_dir.to_path_buf(),
                 source: source.to_path_buf(),
-                verbose: *verbose,
+                verbose: !*quiet,
             },
-            Opts::Clean { source, verbose, .. } => {
+            Opts::Clean { source,quiet, .. } => {
                 SyncerSpecExt::Clean {
                     source: source.to_path_buf(),
-                    verbose: *verbose,
+                    verbose: !*quiet,
                 };
                 todo!()
             }
