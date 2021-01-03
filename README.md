@@ -4,23 +4,71 @@
   
 CryptSync (`csync`) efficiently compresses and encrypts a large set of files and directories.
 
+```txt
+$ ./target/release/csync encrypt src/crypt/syncer/ -vo out
+  Enter your password:
+Confirm your password:
+
+Encrypting: "src/crypt/syncer" -> "out"
+
+                     Random salt:                  (4096-bit)
+                    Spread depth:                  (3)
+        Authentication algorithm:      HMAC-SHA512 (_)
+           Compression algorithm:        Zstandard (level-3)
+            Encryption algorithm:         ChaCha20 (4096-bit salt)
+        Key-derivation algorithm:           Scrypt (log_n: 21, r: 8, p: 1, 4096-bit output, 4096-bit salt)
+
+Generating a derived key... took 6.210620084s
+
+Using 8 threads...
+  3.000  files |  31.406 KB ->  22.114 KB in 23.405ms =   1.342 MB/s...
+                   Files synced:   3.000  files
+                      Data read:  31.406 KB
+                    Data stored:  22.114 KB
+                     Throughput:   1.342 MB/sec
+                       Duration: 23.403ms
+
+$ tree src/crypt/syncer/ out/
+src/crypt/syncer/
+├── mod.rs
+└── util.rs
+out/
+├── i/
+│  └── y/
+│     └── p/
+│        └── vfhhoerwpawv15w4oxobzftrciq4glsmln0laopoio5u2scpxh22wvakgegl1yis/
+│           └── gilcskj3y5bcmm3sbyesy3xpewqwutlmb0et2jphashj21u4choob0x41cfavhml/
+│              └── 5z4sbkeoh1nktskmwud20sdffkjegd2irfehuwzn3sqk0ktefk3a____.csync
+├── t/
+│  └── v/
+│     └── 5/
+│        └── lx2aquvjzphemsdwmjnypbuuwcrto3044cwkxc2dpzdun3kvveieik2mvqbsstne/
+│           └── wrgxdp40k4w4mz0150b3zdvvhgeexl4r1ffq3wezn0og1nq0t3hzoxjw1aiusbjk/
+│              └── afh4red5comhp34rxfvl4scm32______.csync
+└── u/
+   └── g/
+      └── q/
+         └── dab1yu0moucvuzjgbnhafjv2tvzeuyy52pypuj5kvnj35kglchwpjmwyqtavopw3/
+            └── 1acun2nk5p2oh05qlatfjycerinfzj54umo04h2k3fhehza0wcba3ztppzoi3l2i/
+               └── 1a0f2kxujkfyce1jfain0uzk3f2ufgsoqrck2viovg3iaj15uw5a____.csync
+```
+
 ## Features
 
 1. __SECURITY__
     1. Supports [`AES`](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard), [`Chacha20`](https://en.wikipedia.org/wiki/Salsa20#ChaCha_variant) and more to come
     1. Key Derivation algorithms: [`scrypt`](https://en.wikipedia.org/wiki/Scrypt), [`pbkdf2`](https://en.wikipedia.org/wiki/PBKDF2) and more to come
-    1. [Cryptographically Secure Pseudorandom Number Generators](https://rust-random.github.io/rand/rand_chacha/struct.ChaCha20Rng.html)
-    1. Secure random salts with configurable-length, for each file, for each session
-    1. file names are encrypted
-    1. data are compressed and encrypted
-    1. directory structure is obfuscated
+    1. [Cryptographically Secure Pseudorandom Number Generator](https://rust-random.github.io/rand/rand_chacha/struct.ChaCha20Rng.html)
+    1. Random salts generated for each file, and for each session
+    1. File names and contents are encrypted
+    1. Directory structures are obfuscated
 1. __PRIVACY__
-    1. Open Source:
-    1. Client-side: 
+    1. Open Source
+    1. Client-side: no backend and no network communication
 1. __PERFORMANCE__
-    1. fully parallel: designed to utilize 100% of your machine
-    1. 100% Rust
-    1. incremental build
+    1. Fully parallel: designed to utilize 100% of your machine's computing power
+    1. Written in Rust
+    1. Incremental encryption: only the changed files are 
 1. __FUTURE PROOF__
     1. almost all aspects of `csync` can be customized and configured
         1. o
