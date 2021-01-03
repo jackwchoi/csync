@@ -1,3 +1,2 @@
 **/*.rs.bk
 /target
-/build.sh
