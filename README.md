@@ -13,6 +13,7 @@ CryptSync (`csync`) efficiently compresses and encrypts a set of files and direc
 
 ## Summary of `csync`
 
+1. oe
 ```txt
 $ csync --help
 csync 0.1.0
@@ -39,7 +40,7 @@ SUBCOMMANDS:
     encrypt    Encrypt a file/directory to a compressed/encrypted `csync` directory
     help       Prints this message or the help of the given subcommand(s)
 ```
-
+1. o
 ```txt
 $ csync encrypt --help
 csync-encrypt 0.1.0
@@ -120,7 +121,7 @@ ARGS:
     <source>    
             The source directory to csync
 ```
-
+1. aoe
 ```txt
 $ csync decrypt --help
 csync-decrypt 0.1.0
