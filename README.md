@@ -1,19 +1,45 @@
 # CryptSync (`csync`)
-<!--
+
 [![csync crate](https://img.shields.io/crates/v/csync.svg)](https://crates.io/crates/csync)
-[![Colmac documentation](https://docs.rs/colmac/badge.svg)](https://docs.rs/colmac)
--->
+  
+CryptSync (`csync`) efficiently compresses and encrypts a large set of files and directories.
 
-CryptSync (`csync`) efficiently compresses and encrypts a set of files and directories.
+## Motivation
 
-/// `csync` is a one-to-one mapping from source files to their compressed/encrypted counterpart,
-/// unlike tools like `tar` that maps a set of files to a single archive file. This aspect of
-/// `csync` allows for an incremental encryption, where subsequent encryptions on the same
-/// directory only works on 
+One way to backup a set of files with data compression and encryption is to use an archival tool like `tar`,
+followed by a compressor like `gzip`, followed by an encryption tool like `gpg`, like so:
+```bash
+gtar -cf - "$SOURCE" |
+    gzip |
+    gpg --pinentry-mode=loopback -c - > "$BACKUP_FILE"
+```
+
+This process has the following benefits:
+1. it creates one large file that holds the compressed/encrypted data
+
+However it has the following drawbacks:
+1. it creates one large file
+    1. every update forces the creation of the file from scratch
+    1. if we work with thousands of files and gigabytes of data, we don't want to create it from scratch every time
+1. the user is responsible for choosing the right tools to make it performant
+1. need to know about many different tools and settings
+
+## Features
+
+1. __SECURITY__
+    1. o
+1. __PRIVACY__
+    1. client side
+1. __PERFORMANCE__
+    1. fully parallel: designed to utilize 100% of your machine
+    1. 100% Rust
+1. __FUTURE PROOF__
+    1. almost all aspects of `csync` can be customized
 
 ## Summary of `csync`
 
-1. oe
+### a
+
 ```txt
 $ csync --help
 csync 0.1.0
@@ -40,7 +66,9 @@ SUBCOMMANDS:
     encrypt    Encrypt a file/directory to a compressed/encrypted `csync` directory
     help       Prints this message or the help of the given subcommand(s)
 ```
-1. o
+
+### a
+
 ```txt
 $ csync encrypt --help
 csync-encrypt 0.1.0
@@ -120,30 +148,6 @@ OPTIONS:
 ARGS:
     <source>    
             The source directory to csync
-```
-1. aoe
-```txt
-$ csync decrypt --help
-csync-decrypt 0.1.0
-Decrypt a `csync` directory back to its plaintext form
-
-USAGE:
-    csync decrypt [FLAGS] [OPTIONS] <source> --out-dir <out-dir>
-
-FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
-    -v, --verbose    Print information like step-by-step reporting and timing informations
-
-OPTIONS:
-        --num-threads <num-threads-opt>    Use this many threads; defaults to the number of cores available on the
-                                           machine
-    -o, --out-dir <out-dir>                `csync` directory in which compressed/encrypted files will be stored. This
-                                           directory must be empty or be another `csync` directory that accepts the
-                                           password from this session
-
-ARGS:
-    <source>    The source directory to csync
 ```
 
 ### Configurability
@@ -244,84 +248,52 @@ Then the following properties of `csync` holds:
 For example running `csync` on the following `src/` directory would result in something like
 
 ```txt
-$ tree src/crypt
-src/crypt/
-├── action.rs
-├── mod.rs
-├── syncer/
-│  ├── mod.rs
-│  └── util.rs
-└── util.rs
-```
-
-```txt
-$ csync 'src/crypt/' --outdir 'out/' --verbose
-Enter your password:
+$ ./target/release/csync encrypt src/crypt/syncer/ -vo out
+  Enter your password:
 Confirm your password:
 
-Encrypting: "$ROOT/src/crypt" -> "$ROOT/out"
+Encrypting: "src/crypt/syncer" -> "out"
 
                      Random salt:                  (4096-bit)
                     Spread depth:                  (3)
         Authentication algorithm:      HMAC-SHA512 (_)
            Compression algorithm:        Zstandard (level-3)
             Encryption algorithm:         ChaCha20 (4096-bit salt)
-        Key-derivation algorithm:           Scrypt (log_n: 20, r: 8, p: 1, 4096-bit output, 4096-bit salt)
+        Key-derivation algorithm:           Scrypt (log_n: 21, r: 8, p: 1, 4096-bit output, 4096-bit salt)
 
-Generating a derived key... took 2.991910668s
+Generating a derived key... took 6.210620084s
 
 Using 8 threads...
-  7.000  files |  57.933 KB ->  47.574 KB in 29.097ms =   1.991 MB/s...
-                   Files synced:   7.000  files
-                      Data read:  57.933 KB
-                    Data stored:  47.574 KB
-                     Throughput:   1.988 MB/sec
-                       Duration: 29.145ms
+  3.000  files |  31.406 KB ->  22.114 KB in 23.405ms =   1.342 MB/s...
+                   Files synced:   3.000  files
+                      Data read:  31.406 KB
+                    Data stored:  22.114 KB
+                     Throughput:   1.342 MB/sec
+                       Duration: 23.403ms
 
-$ tree out/
+$ tree src/crypt/syncer/ out/
+src/crypt/syncer/
+├── mod.rs
+└── util.rs
 out/
-├── 1/
-│  └── l/
-│     └── q/
-│        └── q0kgbcgyzyss5n32cakciklf4y4zmw1m0msin1gwudstxz5q3pb51hfnavk2f4lf/
-│           └── 35enr2c5ramae___.csync
-├── 3/
-│  └── j/
-│     └── 0/
-│        └── arx1yybo3rsjr1tvjj4epms3ew3rao0utb415nzh5q15csl005uslg0aypebd1v3/
-│           └── glxmfiu3bfozi___.csync
-├── h/
-│  └── d/
-│     └── q/
-│        └── ocazg1kbjnmymsmejhzaybz0w3sd1huybsdqpdu35km4stt31w3q1razzt4uc20a/
-│           └── ix3ymwjsvjxrft3b5vnridhvdrzylbv1r4dsadgehyt51jp5gp2ilmzeyghknwiu/
-│              └── hde45o5fb5t51fkyjkimjmihyzjnxit45lfbypuumzolzbisveia____.csync
-├── k/
-│  └── o/
-│     └── k/
-│        └── b5qiyt1skidya1kbo1lo0amyrmnnodn5ntqfp4wzhgffmjdmyjerf2hd52izhnpo/
-│           └── r5wh024ds1xlk5ddldzg5bwwszp5xkbkzzkjkmcr0vne21n3igisdomow2dxdzhv/
-│              └── epbdpp4xy2obs0iq2s2p3fx1hg2k54c1f44y0xumzmzk2l33jxya____.csync
-├── l/
-│  └── d/
-│     └── u/
-│        └── 1fy30pvd0kvr0sjbjodxyvoyqkcbv3ov2szwnrtvadgveb0v300yzmandcehnv3k/
-│           └── mrrby0udldiuibtuzgg1qcptblvz3v1lsvqohf2lxuw5xllj4gqptsogq2u0rm2v/
-│              └── inocfehgezzvlketfc3vigusw2gegibe341yjrjqxykaf1xjj3xqaazc3iwa0rfi/
-│                 └── whr55mcznbnkzc3ifo0reqeggposgzlxmu5cnwy_.csync
-├── s/
-│  └── m/
-│     └── s/
-│        └── k5mboo02fy1xogzxnkpw4v1mgkxjdoqfr3q302uulompd5zjalg15avniaed2brk/
-│           └── by0ihjaqx4yn4zubyuthf020c5e55fvt0olkzppt0ekx3qug15m31vikv2vgv4vz/
-│              └── ix14xujwu2qofnu1se3dc5yfsq______.csync
-└── t/
-   └── q/
-      └── b/
-         └── 14apjbznabrnjimoxiaoe3doijihcrrxzufs05zpo5hqjxpbpsos0kmyvlc3e4t1/
-            └── bu4knwmniunoffq33qabdopgtlpppszkdcs2vqjftdacnfcrqjijventetsyed5g/
-               └── idtoaegcirgbmpxgdaadxuapq2pxjgbzhq4b0g2aodlkcg1tne2yizp4jer2iws0/
-                  └── wcjistel210vu___.csync
+├── i/
+│  └── y/
+│     └── p/
+│        └── vfhhoerwpawv15w4oxobzftrciq4glsmln0laopoio5u2scpxh22wvakgegl1yis/
+│           └── gilcskj3y5bcmm3sbyesy3xpewqwutlmb0et2jphashj21u4choob0x41cfavhml/
+│              └── 5z4sbkeoh1nktskmwud20sdffkjegd2irfehuwzn3sqk0ktefk3a____.csync
+├── t/
+│  └── v/
+│     └── 5/
+│        └── lx2aquvjzphemsdwmjnypbuuwcrto3044cwkxc2dpzdun3kvveieik2mvqbsstne/
+│           └── wrgxdp40k4w4mz0150b3zdvvhgeexl4r1ffq3wezn0og1nq0t3hzoxjw1aiusbjk/
+│              └── afh4red5comhp34rxfvl4scm32______.csync
+└── u/
+   └── g/
+      └── q/
+         └── dab1yu0moucvuzjgbnhafjv2tvzeuyy52pypuj5kvnj35kglchwpjmwyqtavopw3/
+            └── 1acun2nk5p2oh05qlatfjycerinfzj54umo04h2k3fhehza0wcba3ztppzoi3l2i/
+               └── 1a0f2kxujkfyce1jfain0uzk3f2ufgsoqrck2viovg3iaj15uw5a____.csync
 ```
 
 ## Installing

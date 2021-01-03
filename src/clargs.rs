@@ -87,7 +87,7 @@ pub enum Opts {
 
         /// Evenly distribute the compressed/encrypted files into `64^(spread_depth)` different
         /// directories.
-        #[structopt(long, default_value="3")]
+        #[structopt(long, default_value = "3")]
         spread_depth: u8,
 
         /// Print information like step-by-step reporting and timing informations.
