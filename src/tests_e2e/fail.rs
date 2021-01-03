@@ -269,7 +269,6 @@ AuthenticationFail,                    // checksum verification failed for this 
 DecryptionOutdirIsNonempty(PathBuf),   // when decrypting, outdir must be empty
 HashSpecConflict,                      //
 IncrementalEncryptionDisabledForNow => 100,
-InvalidSpreadDepth(SpreadDepth),       // spread depth is outside of the allowed range
 MetadataLoadFailed(String),            // couldn't load this metadata file
 NonFatalReportFailed,                  //
 Other(String),                         // anything else
@@ -371,51 +370,6 @@ fn source_does_not_have_filename() {
         &format!("-o {}", path_as_str!(&out_dir.path())),
         "-v"
     );
-}
-
-mod invalid_spread_depth {
-    use super::*;
-
-    //
-    macro_rules! testgen {
-            //
-            ( $fn_name:ident, $( $arg:expr ),+ ) => {
-                //
-                #[test]
-                fn $fn_name() {
-                    //
-                    let exit_code = CsyncErr::InvalidSpreadDepth(43).exit_code();
-
-                    // same keys
-                    let key_1 = "wsJlckEFNdxH5v7Z10pulyOzbglPOfAH";
-                    let key_2 = key_1;
-
-                    //
-                    let source = tmpdir!().unwrap();
-                    let out_dir = tmpdir!().unwrap();
-
-                    // encryption checks
-                    check_core!(
-                        exit_code,
-                        key_1,
-                        key_2,
-                        "encrypt",
-                        path_as_str!(&source),
-                        &format!("-o {}", path_as_str!(&out_dir)),
-                        "-v"
-                        $( , $arg )+
-                    );
-                }
-            };
-        }
-
-    testgen!(invalid_0, "--spread-depth 0");
-
-    testgen!(invalid_256, "--spread-depth 256");
-
-    testgen!(invalid_257, "--spread-depth 257");
-
-    testgen!(invalid_12345, "--spread-depth 12345");
 }
 
 mod incremental_encryption_disabled_for_now {

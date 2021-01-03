@@ -72,7 +72,7 @@ pub fn report_syncer_spec(spec: &SyncerSpec) -> String {
         } if *verbose => {
             let action_desc = format!("\n{}ing: {:?} -> {:?}\n\n", action, source, out_dir);
             let salt_desc = format_body!("Random salt", ("", format!("{}-bit", bit_len!(init_salt))));
-            let spread_depth_desc = format_body!("Spread depth", ("", format!("{}", **spread_depth)));
+            let spread_depth_desc = format_body!("Spread depth", ("", format!("{}", *spread_depth)));
             let auth_desc = format_body!(
                 "Authentication algorithm",
                 match authenticator_spec {
@@ -209,7 +209,7 @@ pub fn check_out_dir(out_dir: &Path, spec: &SyncerSpec) -> CsyncResult<()> {
 // 1. `spread_depth`: number of layers used in spreading; a max of `64 ^ spread_depth` number of
 //    distinct directories can be created
 // 2. `path`: the path with which spread dirs will be created
-pub fn path_to_spread(spread_depth: SpreadDepth, init_salt: &CryptoSecureBytes, path: &Path) -> CsyncResult<PathBuf> {
+pub fn path_to_spread(spread_depth: u8, init_salt: &CryptoSecureBytes, path: &Path) -> CsyncResult<PathBuf> {
     debug_assert!(is_canonical(&path).unwrap());
 
     // 'spread dirs are the depth-n dirs created with sha512 in order to spread out the files
@@ -218,7 +218,7 @@ pub fn path_to_spread(spread_depth: SpreadDepth, init_salt: &CryptoSecureBytes, 
         // compute a pathsafe-base64-encoded hash of the pathbuf
         Some(s) => {
             let hash = base32path(sha512!(&s.into(), init_salt).0.unsecure())?;
-            let hash_str = &hash[..*spread_depth as usize];
+            let hash_str = &hash[..spread_depth as usize];
             let hash_string_interspersed: String = hash_str.chars().intersperse('/').collect();
             // get the first spreaod_depth chars of the hash, with '/' interopersed
             Ok(PathBuf::from(hash_string_interspersed))
@@ -320,7 +320,7 @@ pub fn path_to_cipherpath(
 
 //
 pub fn cipherpath_to_path(
-    spread_depth: SpreadDepth,
+    spread_depth: u8,
     src_root: &Path,
     cipherpath: &Path,
     derived_key: &DerivedKey,
@@ -332,7 +332,7 @@ pub fn cipherpath_to_path(
     let spread_hash = spread_to_hash(Path::new(
         &comps
             .iter()
-            .take(*spread_depth as usize)
+            .take(spread_depth as usize)
             .map(|comp| match comp.as_os_str().to_str() {
                 Some(s) => s,
                 None => panic!("dir has been tampered with"),
@@ -346,7 +346,7 @@ pub fn cipherpath_to_path(
     let cipher_bytes: Vec<_> = {
         let ciphertext = comps
             .iter()
-            .skip(*spread_depth as usize)
+            .skip(spread_depth as usize)
             .map(|comp| match comp.as_os_str().to_str() {
                 Some(s) => s,
                 None => panic!("dir has been tampered with"),

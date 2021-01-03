@@ -1,7 +1,6 @@
 use crate::{
     clargs::*,
     prelude::*,
-    primitives::*,
     secure_vec::*,
     specs::{authenticator_spec::*, cipher_spec::*, compressor_spec::*, key_deriv_spec_ext::*},
 };
@@ -19,7 +18,7 @@ pub enum SyncerSpecExt {
         out_dir: PathBuf,
         source: PathBuf,
         //
-        spread_depth_opt: SpreadDepth,
+        spread_depth: u8,
         verbose: bool,
         //
         salt_len: u16,
@@ -83,18 +82,12 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                 salt_len,
                 out_dir,
                 source,
-                spread_depth_opt,
+                spread_depth,
                 verbose,
+                zstd_level,
                 ..
             } => {
-                let spread_depth_opt = match spread_depth_opt {
-                    None => SpreadDepth::new(3),
-                    Some(n) => match 0 < *n && *n <= std::u8::MAX as usize {
-                        true => SpreadDepth::new(*n as u8),
-                        false => csync_err!(InvalidSpreadDepth, *n)?,
-                    },
-                };
-
+                //
                 let kd_spec_ext = extract_kd_opt(&opts)?;
 
                 let auth_spec = match auth.as_str() {
@@ -111,9 +104,7 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                     _ => todo!(),
                 };
                 let compressor_spec = match compressor.as_str() {
-                    "zstd" => CompressorSpec::Zstd {
-                        level: DEFAULT_ZSTD_LEVEL,
-                    },
+                    "zstd" => CompressorSpec::Zstd { level: *zstd_level },
                     _ => todo!(),
                 };
 
@@ -122,7 +113,7 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                     cipher_spec,
                     compressor_spec,
                     kd_spec_ext,
-                    spread_depth_opt,
+                    spread_depth: *spread_depth,
                     out_dir: out_dir.to_path_buf(),
                     source: source.to_path_buf(),
                     verbose: *verbose,

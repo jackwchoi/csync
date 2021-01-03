@@ -20,7 +20,6 @@ pub enum CsyncErr {
     DecryptionOutdirIsNonempty(PathBuf),   // when decrypting, outdir must be empty
     HashSpecConflict,                      //
     IncrementalEncryptionDisabledForNow,   //
-    InvalidSpreadDepth(usize),             // spread depth is outside of the allowed range
     MetadataLoadFailed(String),            // couldn't load this metadata file
     NonFatalReportFailed,                  //
     Other(String),                         // anything else
@@ -46,7 +45,6 @@ impl CsyncErr {
             DecryptionOutdirIsNonempty(_) => 35,
             HashSpecConflict => 36,
             IncrementalEncryptionDisabledForNow => 37,
-            InvalidSpreadDepth(_) => 38,
             MetadataLoadFailed(_) => 39,
             NonFatalReportFailed => 40,
             Other(_) => 41,
@@ -78,7 +76,6 @@ impl Display for CsyncErr {
             ControlFlow => w!("Control flow"),
             DecryptionOutdirIsNonempty(pbuf) => w!("Cannot decrypt to `--outdir={:?}` because it is not empty.", pbuf),
             HashSpecConflict => w!("Cannot specify the strength of the hash with params AND time."),
-            InvalidSpreadDepth(depth) => w!("Spread depth `--spread={}` is not in the allowed range (0, 255]", depth),
             IncrementalEncryptionDisabledForNow => w!("Incremental Encryption is disabled for now"),
             MetadataLoadFailed(message) => w!("Could not load metadata file, password is prbs wrong: {}", message),
             NonFatalReportFailed => w!("Failed to report; is not fatal"),
@@ -150,7 +147,6 @@ mod tests {
             DecryptionOutdirIsNonempty(PathBuf::from("")),
             HashSpecConflict,
             IncrementalEncryptionDisabledForNow,
-            InvalidSpreadDepth(3),
             MetadataLoadFailed("".to_string()),
             NonFatalReportFailed,
             Other("".to_string()),
@@ -172,7 +168,6 @@ mod tests {
                 DecryptionOutdirIsNonempty(_) => true,
                 HashSpecConflict => true,
                 IncrementalEncryptionDisabledForNow => true,
-                InvalidSpreadDepth(_) => true,
                 MetadataLoadFailed(_) => true,
                 NonFatalReportFailed => true,
                 Other(_) => true,

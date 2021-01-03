@@ -1,6 +1,5 @@
 use crate::{
     prelude::*,
-    primitives::*,
     secure_vec::*,
     specs::{authenticator_spec::*, cipher_spec::*, compressor_spec::*, key_deriv_spec::*, syncer_spec_ext::*},
 };
@@ -21,7 +20,7 @@ pub enum SyncerSpec {
         source: PathBuf,
         //
         init_salt: CryptoSecureBytes,
-        spread_depth: SpreadDepth,
+        spread_depth: u8,
         verbose: bool,
         //
         salt_len: u16,
@@ -37,7 +36,7 @@ pub enum SyncerSpec {
         source: PathBuf,
         //
         init_salt: CryptoSecureBytes,
-        spread_depth: SpreadDepth,
+        spread_depth: u8,
         verbose: bool,
         //
         salt_len: u16,
@@ -61,7 +60,7 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                 kd_spec_ext,
                 out_dir,
                 source,
-                spread_depth_opt,
+                spread_depth,
                 verbose,
                 salt_len,
             } => {
@@ -75,7 +74,7 @@ impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
                     key_deriv_spec,
                     out_dir: out_dir.canonicalize()?,
                     source: source.canonicalize()?,
-                    spread_depth: spread_depth_opt.clone(),
+                    spread_depth: *spread_depth,
                     verbose: *verbose,
                     salt_len: *salt_len,
                 })

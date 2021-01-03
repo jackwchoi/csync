@@ -1,3 +1,4 @@
+use crate::prelude::DEFAULT_ZSTD_LEVEL_STR;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -10,63 +11,69 @@ use structopt::StructOpt;
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "csync")]
 pub enum Opts {
-    /// Encrypt a directory to a `csync` directory.
-    ///
-    /// You can configure the following aspects of the encryption process:
-    /// AUTHENTICATION ALGORITHM (`--auth`), COMPRESSION ALGORITHM (`--compressor`), ENCRYPTION
-    /// ALGORITHM (`--cipher`), KEY DERIVATION ALGORITHM (`--pbkdf2-*` and `--scrypt-*`),
-    /// LENGTHS OF RANDOM SALTS (`--salt-len`), NUMBER OF THREADS (`--num-threads`), SPREAD
-    /// DEPTH (`--spread_depth`)
+    /// Encrypt a file/directory to a compressed/encrypted `csync` directory.
     Encrypt {
-        /// Use this authentication algorithm; supported algorithms are: `hmac-sha512`.
+        /// Authentication algorithm to use; supported algorithms are [`hmac-sha512`].
         #[structopt(long, default_value = "hmac-sha512")]
         auth: String,
 
-        /// Use this encryption algorithm; supported algorithms are: `aes256cbc` and `chacha20`.
+        /// Encryption algorithm to use; supported algorithms are [`aes256cbc`, `chacha20`].
         #[structopt(long, default_value = "chacha20")]
         cipher: String,
 
-        /// Use this compression algorithm to use; supported algorithms are: `zstd`.
+        /// Compression algorithm to use; supported algorithms are [`zstd`].
         #[structopt(long, default_value = "zstd")]
         compressor: String,
 
-        /// Use this many threads; defaults to the number of cores available on the machine.
-        #[structopt(short, long = "num-threads")]
+        /// Number of threads to use; defaults to the number of cores available on the machine.
+        #[structopt(long = "num-threads")]
         num_threads_opt: Option<usize>,
 
-        /// The csync directory to be created. If a directory exists under this path, a csync directory
-        /// will be created with a basename identical name as the source directory. If a directory does
-        /// not exist under this path, one will be created.
-        /// TODO make this default for --clean
+        /// `csync` directory in which compressed/encrypted files will be stored. This directory
+        /// must be empty or be another `csync` directory that accepts the password from this
+        /// session.
         #[structopt(short, long, parse(from_os_str))]
         out_dir: PathBuf,
 
-        /// supported options are `scrypt`, `pbkdf2`
-        #[structopt(short, long, default_value = "scrypt")]
+        /// supported options are `scrypt`, `pbkdf2`.
+        #[structopt(long, default_value = "scrypt")]
         key_deriv_alg: String,
+
+        /// Number of seconds the key derivation process should take on this machine. `csync` will
+        /// figure out the approximate parameters
         #[structopt(long, default_value = "4")]
         key_deriv_time: u16,
+
+        /// Indicates that key derivation algorithms should use their explicit parameters rather
+        /// than approximating them based on `--key-deriv-time`.
         ///
+        /// For example, `csync encrypt src -o out` uses `scrypt` with parameters that obey the
+        /// default value of `--key-deriv-time`. Running `csync encrypt src -o out
+        /// --key-deriv-by-params` runs `scrypt` using `--scrypt-log-n`, `--scrypt-r, `--scrypt-p`.
         #[structopt(long)]
         key_deriv_by_params: bool,
 
         /// Use this algorithm within `pbkdf2`; supported options are `hmac-sha512`.
         #[structopt(long = "pbkdf2-alg", default_value = "hmac-sha512")]
         pbkdf2_alg: String,
-        ///
+
+        /// Number of iterations for `pbkdf2`; ignored unless `--key-deriv-by-params` is specified.
         #[structopt(long = "pbkdf2-num-iter", default_value = "131072")]
         pbkdf2_num_iter: u32,
 
-        /// Use this as the `log_2(n)` parameter for `scrypt`.
+        /// `log_2(n)` parameter for `scrypt`; ignored unless `--key-deriv-by-params` is specified.
         #[structopt(long, default_value = "15")]
         scrypt_log_n: u8,
-        /// Use this as the `r` parameter for `scrypt`.
+
+        /// `r` parameter for `scrypt`; ignored unless `--key-deriv-by-params` is specified.
         #[structopt(long, default_value = "8")]
         scrypt_r: u32,
-        /// Use this as the `p` parameter for `scrypt`.
+
+        /// `p` parameter for `scrypt`; ignored unless `--key-deriv-by-params` is specified.
         #[structopt(long, default_value = "1")]
         scrypt_p: u32,
-        ///
+
+        /// Length of the output of `scrypt`, in bytes.
         #[structopt(long, default_value = "512")]
         scrypt_output_len: usize,
 
@@ -78,24 +85,29 @@ pub enum Opts {
         #[structopt(parse(from_os_str))]
         source: PathBuf,
 
-        /// TODO
-        #[structopt(short = "s", long = "spread-depth")]
-        spread_depth_opt: Option<usize>,
+        /// Evenly distribute the compressed/encrypted files into `64^(spread_depth)` different
+        /// directories.
+        #[structopt(long, default_value="3")]
+        spread_depth: u8,
 
         /// Print information like step-by-step reporting and timing informations.
         #[structopt(short, long)]
         verbose: bool,
+
+        /// Compression level for `zstd`, allowed range is 1-19.
+        #[structopt(long, default_value = DEFAULT_ZSTD_LEVEL_STR)]
+        zstd_level: u8,
     },
 
     /// Decrypt a `csync` directory back to its plaintext form.
     Decrypt {
         /// Use this many threads; defaults to the number of cores available on the machine.
-        #[structopt(short, long = "num-threads")]
+        #[structopt(long = "num-threads")]
         num_threads_opt: Option<usize>,
 
-        /// The csync directory to be created. If a directory exists under this path, a csync directory
-        /// will be created with a basename identical name as the source directory. If a directory does
-        /// not exist under this path, one will be created.
+        /// `csync` directory in which compressed/encrypted files will be stored. This directory
+        /// must be empty or be another `csync` directory that accepts the password from this
+        /// session.
         #[structopt(short, long, parse(from_os_str))]
         out_dir: PathBuf,
 
@@ -111,7 +123,7 @@ pub enum Opts {
     /// Clean a `csync` directory by making it as compact as possible.
     Clean {
         /// Use this many threads; defaults to the number of cores available on the machine.
-        #[structopt(short, long = "num-threads")]
+        #[structopt(long = "num-threads")]
         num_threads_opt: Option<usize>,
 
         /// The source directory to csync.

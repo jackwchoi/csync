@@ -439,7 +439,7 @@ impl Syncer {
                         let cipherpath = entry_res?.path().canonicalize()?;
                         debug_assert!(is_canonical(&cipherpath).unwrap());
                         let (path, file_type, _) =
-                            cipherpath_to_path(spread_depth.clone(), source, &cipherpath, &self.derived_key)?;
+                            cipherpath_to_path(*spread_depth, source, &cipherpath, &self.derived_key)?;
                         Action::new(
                             &self.spec,
                             *salt_len,
