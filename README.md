@@ -99,7 +99,8 @@ and is secure.
 
 ### Configurability
 
-Almost everything about csync can be configured. Below are some of those configurable aspects; default configs are __BOLDED__:
+Almost everything about `csync` can be configured (default configurations are __bolded__):
+
 1. [Encryption](https://en.wikipedia.org/wiki/Encryption) algorithm, and its parameters
     1. [__`ChaCha20`__](https://en.wikipedia.org/wiki/Salsa20#ChaCha20_adoption)
     1. [`AES-256-CBC`](https://en.wikipedia.org/wiki/AES_implementations#Implementation_Considerations)
@@ -148,21 +149,6 @@ TODO
 `csync` aims to solve similar goals as tools like `Cryptomator`.
 
 TODO TODO TODO
-
-## Motivation
-
-One easy way to create an encrypted and compressed backup of a directory is by creating an archive, like the following:
-```bash
-gtar -cf - some_dir/ |
-  pigz --fast - |
-  gpg --pinentry-mode=loopback -c - > archive.tar.gz.gpg
-```
-
-There are some pain points with this, mostly because this creates one large file:
-1. Some cloud storage services don't allow files greater than some fixed size limit
-1. Making small updates is impossible; you have to remake the whole archive
-
-Crypt Sync aims to solve this problem by preserving the directory structure during the compression/encrpytion.
 
 ## Performance / Memory Usage
 
