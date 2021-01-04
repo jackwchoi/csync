@@ -4,7 +4,7 @@
   
 CryptSync (`csync`) efficiently compresses and encrypts a large set of files and directories.
 
-```txt
+```bash
 $ csync encrypt src/crypt/syncer/ -vo out
   Enter your password:
 Confirm your password:
