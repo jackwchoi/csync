@@ -21,7 +21,10 @@ impl RehashSpec {
         // NOTE this is a constant time operation, given that `SecureVec`'s `Eq` is const
         match &self.rehash(key_hash)? == rehash {
             true => Ok(()),
-            false => csync_err!(AuthenticationFail),
+            false => {
+                eprintln!("rehash spec auth fail");
+                csync_err!(AuthenticationFail)
+            },
         }
     }
 }

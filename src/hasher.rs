@@ -48,6 +48,14 @@ macro_rules! scrypt {
     };
 }
 
+#[inline]
+pub fn deterministic_hash<T>(key: T) -> CryptoSecureBytes
+where
+    T: Into<SecureBytes>,
+{
+    sha512!(&key.into())
+}
+
 /// output_len_opt must be less than
 pub fn scrypt_custom(
     params: ScryptParams,
@@ -105,6 +113,14 @@ mod tests {
     ///
     fn keys<'a>() -> Vec<&'a str> {
         vec!["", "a", "asf", "123", "asfoij123r98!@$%#@$Q%#$T"]
+    }
+
+    #[test]
+    fn deterministic_hash_is_deterministic() {
+        let hashes: HashSet<_> = (0..8)
+            .map(|_| deterministic_hash(b"eFCP7Na7MQxw6e0txvqVcC8BENvcxzZkbi3mafbXI4aNL8VVor8xjjgMPJahIRib".to_vec()))
+            .collect();
+        assert_eq!(hashes.len(), 1);
     }
 
     ///

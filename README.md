@@ -1,7 +1,7 @@
 # CryptSync (`csync`)
 
 [![csync crate](https://img.shields.io/crates/v/csync.svg)](https://crates.io/crates/csync)
-  
+
 CryptSync (`csync`) efficiently compresses and encrypts a large set of files and directories.
 
 ```bash

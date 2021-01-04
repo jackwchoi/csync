@@ -39,6 +39,7 @@ use crate::{
     prelude::*,
     secure_vec::*,
     specs::prelude::*,
+    hasher::deterministic_hash,
     util::*,
 };
 use rayon::prelude::*;
@@ -55,7 +56,11 @@ use structopt::StructOpt;
 // TODO
 // 1. dry run flag to show which files would be run on
 // 2. incremental build
-
+// 3. https://docs.rs/crossterm/0.19.0/crossterm/ for indicating how many texts
+// 4. https://crates.io/crates/indicatif for human readable bytes and yarnish.rs and human
+//    durations
+// 5. https://docs.rs/dialoguer/0.7.1/dialoguer/ for input
+  
 assert_cfg!(unix, "Only Unix systems are supported for now");
 
 // Use like `format!`, except that use `$color` is an additional argument that goes in the front
@@ -116,7 +121,7 @@ fn main() {
 fn get_password(confirm: bool) -> CsyncResult<CryptoSecureBytes> {
     //
     let get = |disp| match rpassword::prompt_password_stderr(disp) {
-        Ok(pw) => Ok(sha512!(&pw.into())),
+        Ok(pw) => Ok(deterministic_hash(pw)),
         Err(err) => csync_err!(Other, format!("Problem reading the password: {}", err)),
     };
     let initial = get("  Enter your password: ")?;

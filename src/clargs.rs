@@ -40,11 +40,11 @@ pub enum Opts {
         key_deriv_alg: String,
 
         /// Number of seconds the key derivation process should take on this machine. `csync` will
-        /// approximate the parameters for the key derivation algorithm of your choosing, in order 
+        /// approximate the parameters for the key derivation algorithm of your choosing, in order
         /// to meet this requirement.
         ///
-        /// Note that this *approximates*: if your key derivation algorithm is `pbkdf2`, `csync` 
-        /// can approximate the parameters almost exactly. `scrypt` however, is tricky, and the 
+        /// Note that this *approximates*: if your key derivation algorithm is `pbkdf2`, `csync`
+        /// can approximate the parameters almost exactly. `scrypt` however, is tricky, and the
         /// key derivation may take up to, but no more than twice as long as the requested timing.
         #[structopt(long, default_value = "2")]
         key_deriv_time: u16,
@@ -83,7 +83,7 @@ pub enum Opts {
         scrypt_output_len: usize,
 
         /// Generate cryptographically secure pseudorandom salts that are this many bytes long.
-        /// 
+        ///
         /// New salts are generated each time salts are needed.
         #[structopt(long, default_value = "512")]
         salt_len: u16,

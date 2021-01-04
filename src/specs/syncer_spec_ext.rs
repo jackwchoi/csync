@@ -121,16 +121,13 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
                 }
             }
             Opts::Decrypt {
-                source,
-                out_dir,
-                quiet,
-                ..
+                source, out_dir, quiet, ..
             } => SyncerSpecExt::Decrypt {
                 out_dir: out_dir.to_path_buf(),
                 source: source.to_path_buf(),
                 verbose: !*quiet,
             },
-            Opts::Clean { source,quiet, .. } => {
+            Opts::Clean { source, quiet, .. } => {
                 SyncerSpecExt::Clean {
                     source: source.to_path_buf(),
                     verbose: !*quiet,
