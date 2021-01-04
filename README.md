@@ -5,7 +5,7 @@
 CryptSync (`csync`) efficiently compresses and encrypts a large set of files and directories.
 
 ```txt
-$ ./target/release/csync encrypt src/crypt/syncer/ -vo out
+$ csync encrypt src/crypt/syncer/ -vo out
   Enter your password:
 Confirm your password:
 
@@ -56,27 +56,26 @@ out/
 ## Features
 
 1. __SECURITY__
-    1. Supports [`AES`](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard), [`Chacha20`](https://en.wikipedia.org/wiki/Salsa20#ChaCha_variant) and more to come
-    1. Key Derivation algorithms: [`scrypt`](https://en.wikipedia.org/wiki/Scrypt), [`pbkdf2`](https://en.wikipedia.org/wiki/PBKDF2) and more to come
-    1. [Cryptographically Secure Pseudorandom Number Generator](https://rust-random.github.io/rand/rand_chacha/struct.ChaCha20Rng.html)
-    1. Random salts generated for each file, and for each session
-    1. File names and contents are encrypted
+    1. Encryption algorithms: [`AES`](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard), [`Chacha20`](https://en.wikipedia.org/wiki/Salsa20#ChaCha_variant) and more to come
+    1. Key-derivation algorithms: [`scrypt`](https://en.wikipedia.org/wiki/Scrypt), [`pbkdf2`](https://en.wikipedia.org/wiki/PBKDF2) and more to come
+    1. Cryptographically secure pseudorandom number generators: [Chacha20](https://rust-random.github.io/rand/rand_chacha/struct.ChaCha20Rng.html)
+    1. Cryptographically secure pseudorandom salts, generated for each file, and for each session
+    1. File names and contents are encrypted and obfuscated
     1. Directory structures are obfuscated
 1. __PRIVACY__
-    1. Open Source
-    1. Client-side: no backend and no network communication
+    1. Open source!
+    1. Client-side: no network communication and self contained
 1. __PERFORMANCE__
     1. Fully parallel: designed to utilize 100% of your machine's computing power
-    1. Written in Rust
-    1. Incremental encryption: only the changed files are 
+    1. Rust!
+    1. Incremental encryption: only the changed files are updated 
 1. __FUTURE PROOF__
     1. almost all aspects of `csync` can be customized and configured
-        1. o
+        1. `csync` uses the encryption and key-derivation algorithms, as well as their parameters of your choosing
 
 ## Motivation
 
-One way to compress, encrypt and backup a set of files is to use an archival tool like `tar`, a compressor 
-like `gzip`, then an encryption tool like `gpg`:
+One way to compress, encrypt and backup a set of files is to create a compressed/encrypted archival file, like so:
 ```bash
 gtar -cf - "$SOURCE" |
     gzip |
@@ -84,18 +83,19 @@ gtar -cf - "$SOURCE" |
 ```
 
 This workflow has the following benefits:
-1. it creates one large file that holds the compressed/encrypted data
+1. Simple: it creates one large file that holds the compressed/encrypted data
 
 However it has the following drawbacks:
-1. it creates one large file
-    1. every update forces the creation of the file from scratch
-    1. if we work with thousands of files and gigabytes of data, we don't want to create it from scratch every time
-1. the user is responsible for choosing the right tools to make it performant
-1. need to know about many different tools and settings
+1. Simple: it creates one large file
+    1. Each update forces the file to be recreated from scratch
+    1. This is inefficient when you are only changing a small number of files
+1. Users are responsible for ensuring performance and security
+1. Users need to know about many tools and their parameters
 
-## Summary of `csync`
+`csync` tries to solve these issues by choosing configurations that make sense, is performant,
+and is secure.
 
-### a
+## Details of `csync`
 
 ### Configurability
 
