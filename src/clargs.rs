@@ -21,7 +21,7 @@ pub enum Opts {
         #[structopt(long, default_value = "chacha20")]
         cipher: String,
 
-        /// Compression algorithm to use; supported algorithms are [`zstd`].
+        /// Compression algorithm to use; supported algorithms are [`zstd`]. `gzip` to come soon!
         #[structopt(long, default_value = "zstd")]
         compressor: String,
 
@@ -35,13 +35,18 @@ pub enum Opts {
         #[structopt(short, long, parse(from_os_str))]
         out_dir: PathBuf,
 
-        /// supported options are `scrypt`, `pbkdf2`.
+        /// Key-derivation algorithm to use; supported options are `scrypt`, `pbkdf2`.
         #[structopt(long, default_value = "scrypt")]
         key_deriv_alg: String,
 
         /// Number of seconds the key derivation process should take on this machine. `csync` will
-        /// approximate the parameters of `--key-deriv-alg` in order to meet this requirement.
-        #[structopt(long, default_value = "4")]
+        /// approximate the parameters for the key derivation algorithm of your choosing, in order 
+        /// to meet this requirement.
+        ///
+        /// Note that this *approximates*: if your key derivation algorithm is `pbkdf2`, `csync` 
+        /// can approximate the parameters almost exactly. `scrypt` however, is tricky, and the 
+        /// key derivation may take up to, but no more than twice as long as the requested timing.
+        #[structopt(long, default_value = "2")]
         key_deriv_time: u16,
 
         /// Indicates that key derivation algorithms should use their explicit parameters rather
@@ -77,7 +82,9 @@ pub enum Opts {
         #[structopt(long, default_value = "512")]
         scrypt_output_len: usize,
 
-        /// Use salts that are this many bytes long.
+        /// Generate cryptographically secure pseudorandom salts that are this many bytes long.
+        /// 
+        /// New salts are generated each time salts are needed.
         #[structopt(long, default_value = "512")]
         salt_len: u16,
 

@@ -99,7 +99,7 @@ and is secure.
 
 ### Configurability
 
-Almost everything about `csync` can be configured (default configurations are __bolded__):
+Almost everything about `csync` can be configured (default configurations are __bolded__). See the following help page:
 
 1. [Encryption](https://en.wikipedia.org/wiki/Encryption) algorithm, and its parameters
     1. [__`ChaCha20`__](https://en.wikipedia.org/wiki/Salsa20#ChaCha20_adoption)
