@@ -24,7 +24,7 @@ impl RehashSpec {
             false => {
                 eprintln!("rehash spec auth fail");
                 csync_err!(AuthenticationFail)
-            },
+            }
         }
     }
 }

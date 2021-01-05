@@ -36,10 +36,10 @@ mod tests_e2e;
 use crate::{
     clargs::{Opts, Opts::*},
     crypt::syncer::*,
+    hasher::deterministic_hash,
     prelude::*,
     secure_vec::*,
     specs::prelude::*,
-    hasher::deterministic_hash,
     util::*,
 };
 use rayon::prelude::*;
@@ -60,7 +60,7 @@ use structopt::StructOpt;
 // 4. https://crates.io/crates/indicatif for human readable bytes and yarnish.rs and human
 //    durations
 // 5. https://docs.rs/dialoguer/0.7.1/dialoguer/ for input
-  
+
 assert_cfg!(unix, "Only Unix systems are supported for now");
 
 // Use like `format!`, except that use `$color` is an additional argument that goes in the front
