@@ -1,59 +1,7 @@
-use crate::tests_e2e::util::*;
-use crate::{fs_util::*, prelude::*, test_util::*, util::*};
+use crate::{fs_util::*, prelude::*, test_util::*, tests_e2e::success::util::*, util::*};
 use itertools::Itertools;
 use std::{io::Write, path::PathBuf};
 use tempfile::TempDir;
-
-#[test]
-fn encrypted_dir_basename_changed() {
-    let source = tmpdir!().unwrap();
-    let source = source.path();
-
-    // pass
-    let exit_code = 0;
-
-    //
-    let tmpd = tmpdir!().unwrap();
-
-    //
-    let out_dir = tmpd.path().join("auVj2ZazQDC0ZNvgAp7WyhIfR0PSTyJS");
-    std::fs::create_dir(&out_dir).unwrap();
-    //
-    let renamed_out_dir = tmpd.path().join("jhlqRjoF7Iy3xA8TKtCpxiCr6YdH2cMC");
-
-    //
-    let out_out_dir = tmpdir!().unwrap();
-    let out_out_dir = out_out_dir.path();
-
-    // same keys, so it shouldn't fail from mismatch
-    let key_1 = "NbhfRifWQdHyUHPTrK0joRJ7u1NvsGL1";
-    let key_2 = key_1;
-
-    // encryption checks
-    check_encrypt!(
-        exit_code,
-        &source,
-        &out_dir,
-        key_1,
-        key_2,
-        path_as_str!(&source),
-        &format!("-o {}", path_as_str!(&out_dir))
-    );
-
-    std::fs::rename(&out_dir, &renamed_out_dir).unwrap();
-
-    // decryption checks
-    check_decrypt!(
-        exit_code,
-        &renamed_out_dir,
-        &out_out_dir,
-        &source,
-        key_1,
-        key_2,
-        path_as_str!(&renamed_out_dir),
-        &format!("-o {}", path_as_str!(&out_out_dir))
-    );
-}
 
 //
 macro_rules! generate_success_body {
@@ -103,36 +51,6 @@ macro_rules! generate_success_body {
                 path_as_str!(out_dir),
                 &format!("-o {}", path_as_str!(out_out_dir))
             );
-        }
-    }
-}
-
-// # Parameters
-//
-// 1. `$mod_name`
-// 1. `$key`
-// 1. `$( , $arg )*`: string args to pass to the csync prorcess
-macro_rules! generate_mod {
-    //
-    ( $mod_name:ident, $key:literal $( , $arg:literal )* ) => {
-        //
-        mod $mod_name {
-            use super::*;
-
-            //
-            macro_rules! generate_test {
-                ( $fn_name:ident, $pbuf_and_tmpd:expr ) => {
-                    generate_success_body!(
-                        $fn_name,
-                        $pbuf_and_tmpd,
-                        $key
-                        $( , $arg )*
-                    );
-                };
-            }
-
-            //
-            generate_suite!(generate_test);
         }
     }
 }
