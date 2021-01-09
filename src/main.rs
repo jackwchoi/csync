@@ -31,10 +31,13 @@ mod crypt;
 #[cfg(test)]
 mod tests_e2e;
 
+mod cli;
+
 ////////////////////////////////  ////////////////////////////////
 
 use crate::{
     clargs::{Opts, Opts::*},
+    cli::*,
     crypt::syncer::*,
     hasher::deterministic_hash,
     prelude::*,
@@ -248,8 +251,22 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
         Encrypt { .. } => true,
         Decrypt { .. } | Clean { .. } => false,
     };
-    let init_key = get_password(confirm_password)?;
+    //let init_key = get_password(confirm_password)?;
 
+    let init_key = {
+        let initial = deterministic_hash(cli::run(false));
+        match confirm_password {
+            true => {
+                let confirm = deterministic_hash(cli::run(true));
+                // constant time comparison
+                match initial == confirm {
+                    true => Ok(initial),
+                    false => csync_err!(PasswordConfirmationFail),
+                }
+            }
+            false => Ok(initial),
+        }
+    }?;
     // TODO do an initial scan to get file count and size count to get an approxdmate duration?
 
     //
