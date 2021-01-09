@@ -26,6 +26,10 @@ macro_rules! proportion {
     };
 }
 
+
+// TODO refactor
+//
+// too long
 pub fn run<F>(confirm: bool, key_matches: F) -> SecureBytes
 where
     F: Fn(SecureBytes) -> Option<bool>,
