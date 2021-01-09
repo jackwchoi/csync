@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate static_assertions;
-
 // dependency free
 mod primitives;
 mod secure_vec;
@@ -37,7 +34,6 @@ mod cli;
 
 use crate::{
     clargs::{Opts, Opts::*},
-    cli::*,
     crypt::syncer::*,
     hasher::deterministic_hash,
     prelude::*,
@@ -64,8 +60,6 @@ use termion::color;
 // 4. https://crates.io/crates/indicatif for human readable bytes and yarnish.rs and human
 //    durations
 // 5. https://docs.rs/dialoguer/0.7.1/dialoguer/ for input
-
-assert_cfg!(unix, "Only Unix systems are supported for now");
 
 macro_rules! color {
     ( $color:ident, $fmt_str:literal $( , $arg:expr )* ) => {
@@ -111,29 +105,6 @@ fn main() {
             //
             std::process::exit(exit_code);
         }
-    }
-}
-
-//
-fn get_password(confirm: bool) -> CsyncResult<CryptoSecureBytes> {
-    //
-    let get = |disp| match rpassword::prompt_password_stderr(disp) {
-        Ok(pw) => Ok(deterministic_hash(pw)),
-        Err(err) => csync_err!(Other, format!("Problem reading the password: {}", err)),
-    };
-    let initial = get("  Enter your password: ")?;
-
-    match confirm {
-        true => {
-            let confirm = get("Confirm your password: ")?;
-
-            // constant time comparison
-            match initial == confirm {
-                true => Ok(initial),
-                false => csync_err!(PasswordConfirmationFail),
-            }
-        }
-        false => Ok(initial),
     }
 }
 
@@ -357,6 +328,7 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
 mod tests {
     // this is mostly due to the fact that we use perm bits
     // maybe
+
     #[test]
     fn os_is_unix() {
         assert!(cfg!(unix));

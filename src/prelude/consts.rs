@@ -24,9 +24,6 @@ pub const DEFAULT_ZSTD_LEVEL_STR: &str = "3"; // same as the `zstd` executable
 
 pub const FILE_SUFFIX: &str = "csync"; // extension for encrypted files
 
-const_assert!(0 < DEFAULT_ZSTD_LEVEL && DEFAULT_ZSTD_LEVEL <= 23);
-const_assert!(DEFAULT_BUFFER_SIZE == 16384);
-
 #[cfg(test)]
 mod tests {
     use super::*;

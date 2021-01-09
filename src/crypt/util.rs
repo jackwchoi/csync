@@ -23,10 +23,6 @@ const PAD_DELIMITER: u8 = 0;
 pub const MIN_DIR_RAND_DATA_LEN: u64 = 1 << 4;
 pub const MAX_DIR_RAND_DATA_LEN: u64 = 1 << 10;
 
-const_assert!(MAX_RANDPAD_LEN == 2048);
-const_assert!(MIN_DIR_RAND_DATA_LEN == 16);
-const_assert!(MAX_DIR_RAND_DATA_LEN == 1024);
-
 // # Parameters
 //
 // 1. `data`: some data to serialize
