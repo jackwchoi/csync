@@ -2,6 +2,8 @@ use crate::secure_vec::*;
 use std::io::{stderr, stdin, Write};
 use termion::{cursor, event::Key, input::TermRead, raw::IntoRawMode, screen::AlternateScreen};
 
+// TODO  instead of white, use foreground
+
 macro_rules! color {
     ( $color:ident, $fmt_str:literal $( , $arg:expr )* ) => {
         ansi_term::Colour::$color.paint(format!($fmt_str $( , $arg )*))
@@ -19,24 +21,16 @@ macro_rules! left {
     };
 }
 
-macro_rules! write_color {
-    ( $screen:expr, $color:ident, $goto:expr, $header:expr $( , $arg:expr )+ ) => {
-        write!(
-            $screen,
-            "{}",
-            color!($color, "{}{:>23}{}", $goto, $header $( , $arg )+ )
-        )
-        .unwrap()
-    }
-}
-
 macro_rules! proportion {
     ( $frac:literal, $value:expr ) => {
         ($frac * $value as f64).round() as u16
     };
 }
 
-pub fn run(confirm: bool) -> SecureBytes {
+pub fn run<F>(confirm: bool, key_matches: F) -> SecureBytes
+where
+    F: Fn(SecureBytes) -> Option<bool>,
+{
     // console has a way to see if stderr is attended
     // use that as the main gateway or tty
 
@@ -91,38 +85,56 @@ pub fn run(confirm: bool) -> SecureBytes {
 
     // cache
     macro_rules! cached_write {
-        ( $cache:ident, $fmt_str:literal $( , $arg:expr )* ) => {{
-            let content = format!($fmt_str, $( $arg ),*);
-            if $cache != content {
+        ( $cache:ident, $fmt_str:literal $( , $arg:expr )* ) => {
+            cached_write!($cache, {true}, {}, $fmt_str $( , $arg )*)
+        };
+        ( $cache:ident, $cache_check:block, $if_stale:block, $fmt_str:literal $( , $arg:expr )* ) => {{
+            let content = format!("{}", format!($fmt_str, $( $arg ),*));
+            if $cache != content && $cache_check {
                 $cache = content;
-                write_color!(screen, White, $cache, "", "");
+                write!(screen, "{}", $cache).unwrap();
+                $if_stale;
             }
         }};
+        ( $cache:ident, $color:ident, $goto:expr, $header:expr, $desc:expr ) => {{
+            let uncolored_content = format!("{}{:>23}{}", $goto, $header, $desc);
+            if $cache != uncolored_content {
+
+                clean!($goto, $cache);
+
+                $cache = uncolored_content;
+                let colored_content = color!($color, "{}", $cache);
+                write!(screen, "{}", colored_content).unwrap();
+            }
+        }}
     }
 
     let mut cache_clean = String::new();
     macro_rules! clean {
-        ( $goto:expr ) => {{
+        ( $goto:expr, $content_cache:ident ) => {
             cached_write!(
                 cache_clean,
+                { 0 < $content_cache.len() },
+                { $content_cache.clear() },
                 "{}{}",
                 $goto,
-                (0..pw_portion_width + enter_message_len)
-                    .map(|_| ' ')
-                    .collect::<String>()
-            );
-        }};
+                (0..$content_cache.len()).map(|_| ' ').collect::<String>()
+            )
+        };
     }
 
+    let mut cache_length = String::new();
     let mut cache_strength = String::new();
+    let mut cache_suggestion = String::new();
+    let mut cache_warning = String::new();
     macro_rules! diag {
         () => {
-            clean!(pw_len_goto);
-            write_color!(screen, White, pw_len_goto, LENGTH_HEADER, chars.len());
+            //clean!(pw_len_goto, cache_length);
+            cached_write!(cache_length, White, pw_len_goto, LENGTH_HEADER, chars.len());
 
             if 0 < chars.len() {
                 // write strength
-                clean!(score_goto);
+                //clean!(score_goto, cache_strength);
                 let desc = match score(&mut chars) {
                     0 => color!(Red, "SUX"),
                     1 => color!(Red, "VERY BAD"),
@@ -131,20 +143,26 @@ pub fn run(confirm: bool) -> SecureBytes {
                     4 => color!(Green, "EXCELLENT"),
                     _ => unreachable!(),
                 };
-                write_color!(screen, White, score_goto, STRENGTH_HEADER, desc);
+                cached_write!(cache_strength, White, score_goto, STRENGTH_HEADER, desc);
 
                 // write suggestions
-                clean!(sugg_goto);
-                clean!(warning_goto);
-                if let Some(sugg) = zxcvbn::zxcvbn(&chars.iter().collect::<String>(), &[])
+                //clean!(sugg_goto, cache_suggestion);
+                //clean!(warning_goto, cache_warning);
+                let (sugg, warning) = match zxcvbn::zxcvbn(&chars.iter().collect::<String>(), &[])
                     .unwrap()
                     .feedback()
                 {
-                    write_color!(screen, Yellow, sugg_goto, SUGGESTION_HEADER, sugg.suggestions()[0]);
-                    if let Some(warning) = sugg.warning() {
-                        write_color!(screen, Yellow, warning_goto, WARNING_HEADER, warning);
-                    }
-                }
+                    Some(sugg) => (
+                        format!("{}", sugg.suggestions()[0]),
+                        match sugg.warning() {
+                            Some(warning) => format!("{}", warning),
+                            None => String::new(),
+                        },
+                    ),
+                    None => (String::new(), String::new()),
+                };
+                cached_write!(cache_suggestion, Yellow, sugg_goto, SUGGESTION_HEADER, sugg);
+                cached_write!(cache_warning, Yellow, warning_goto, WARNING_HEADER, warning);
             }
         };
     }
@@ -153,21 +171,61 @@ pub fn run(confirm: bool) -> SecureBytes {
         draw_border(&mut screen, border_l, border_r, border_t, border_b);
     }
 
-    write!(
-        screen,
-        "{}{}{}",
-        prompt_goto,
-        format!(
-            "{:>23}{}",
-            match confirm {
-                true => CONFIRM_HEADER,
-                false => ENTER_HEADER,
-            },
-            (0..pw_portion_width).map(|_| '_').collect::<String>()
-        ),
-        left!(pw_portion_width)
-    )
-    .unwrap();
+    let mask_char = |matches| match matches {
+        true => '\u{2713}',
+        false => '\u{10102}',
+    };
+    macro_rules! rewrite_prompt {
+        ( $color:ident, $mask:expr ) => {
+            write!(
+                screen,
+                "{}{}",
+                prompt_goto,
+                color!(
+                    $color,
+                    "{}{}",
+                    format!(
+                        "{:>23}{}{}",
+                        match confirm {
+                            true => CONFIRM_HEADER,
+                            false => ENTER_HEADER,
+                        },
+                        (0..chars.len()).map(|_| $mask).collect::<String>(),
+                        (chars.len()..pw_portion_width as usize)
+                            .map(|_| '_')
+                            .collect::<String>()
+                    ),
+                    left!(pw_portion_width)
+                )
+            )
+            .unwrap()
+        };
+    }
+    rewrite_prompt!(White, mask_char(true));
+
+    let mut is_match = None;
+
+    macro_rules! matches {
+        () => {
+            key_matches(chars.iter().copied().collect::<String>().as_bytes().to_vec().into())
+        };
+    }
+    macro_rules! color_match {
+        (  ) => {{
+            let new_matches = matches!();
+            match is_match == new_matches {
+                true => (),
+                false => {
+                    is_match = new_matches;
+                    match new_matches {
+                        Some(true) => rewrite_prompt!(Green, mask_char(true)),
+                        Some(false) => rewrite_prompt!(Red, mask_char(false)),
+                        None => rewrite_prompt!(White, mask_char(true)),
+                    }
+                }
+            }
+        }};
+    }
     for key_down in stdin().keys() {
         //
         match key_down.unwrap() {
@@ -179,22 +237,47 @@ pub fn run(confirm: bool) -> SecureBytes {
             //
             Key::Backspace if 0 < chars.len() => {
                 if let Some(goto) = goto_backspace(&mut chars) {
-                    write!(screen, "{}{}_{}", goto, left!(1), left!(1)).unwrap();
+                    write!(
+                        screen,
+                        "{}{}{}{}",
+                        goto,
+                        left!(1),
+                        match is_match {
+                            Some(true) => color!(Green, "_"),
+                            Some(false) => color!(Red, "_"),
+                            None => color!(White, "_"),
+                        },
+                        left!(1)
+                    )
+                    .unwrap();
                 }
                 chars.pop().unwrap();
                 if 5 <= term_height {
                     diag!();
                 }
+
+                color_match!();
             }
             //
             Key::Char(chr) => {
                 if let Some(goto) = goto_asterisk(&mut chars) {
-                    write!(screen, "{}*", goto).unwrap();
+                    write!(
+                        screen,
+                        "{}{}",
+                        goto,
+                        match is_match {
+                            Some(true) => color!(Green, "{}", mask_char(true)),
+                            Some(false) => color!(Red, "{}", mask_char(false)),
+                            None => color!(White, "{}", mask_char(true)),
+                        },
+                    )
+                    .unwrap();
                 }
                 chars.push(chr);
                 if 5 <= term_height {
                     diag!();
                 }
+                color_match!();
             }
             //
             _ => (),

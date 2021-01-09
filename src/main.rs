@@ -254,10 +254,10 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
     //let init_key = get_password(confirm_password)?;
 
     let init_key = {
-        let initial = deterministic_hash(cli::run(false));
+        let initial = deterministic_hash(cli::run(false, |_| None));
         match confirm_password {
             true => {
-                let confirm = deterministic_hash(cli::run(true));
+                let confirm = deterministic_hash(cli::run(true, |k| Some(deterministic_hash(k) == initial)));
                 // constant time comparison
                 match initial == confirm {
                     true => Ok(initial),
