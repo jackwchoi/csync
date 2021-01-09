@@ -53,6 +53,7 @@ use std::{
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
+use termion::color;
 
 ////////////////////////////////  ////////////////////////////////
 
@@ -66,16 +67,9 @@ use structopt::StructOpt;
 
 assert_cfg!(unix, "Only Unix systems are supported for now");
 
-// Use like `format!`, except that use `$color` is an additional argument that goes in the front
-//
-// # Parameters
-//
-// 1. `$color`: variant of `ansi_term::Colour`, for example `Green` or `Red`
-// 1. `$fmt_str`:
-// 1. `$arg`:
 macro_rules! color {
     ( $color:ident, $fmt_str:literal $( , $arg:expr )* ) => {
-        ansi_term::Colour::$color.paint(format!($fmt_str $( , $arg )*))
+        format!("{}{}{}", color::Fg(color::$color), format!($fmt_str $( , $arg )*), color::Fg(color::Reset))
     }
 }
 

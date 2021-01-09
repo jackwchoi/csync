@@ -1,14 +1,13 @@
 use crate::secure_vec::*;
 use std::io::{stderr, stdin, Write};
-use termion::{cursor, event::Key, input::TermRead, raw::IntoRawMode, screen::AlternateScreen};
-
-// TODO  instead of white, use foreground
+use termion::{color, cursor, event::Key, input::TermRead, raw::IntoRawMode, screen::AlternateScreen};
 
 macro_rules! color {
     ( $color:ident, $fmt_str:literal $( , $arg:expr )* ) => {
-        ansi_term::Colour::$color.paint(format!($fmt_str $( , $arg )*))
+        format!("{}{}{}", color::Fg(color::$color), format!($fmt_str $( , $arg )*), color::Fg(color::Reset))
     }
 }
+
 macro_rules! goto {
     ( $x:expr, $y:expr ) => {
         cursor::Goto($x, $y)
@@ -129,40 +128,42 @@ where
     let mut cache_warning = String::new();
     macro_rules! diag {
         () => {
-            //clean!(pw_len_goto, cache_length);
-            cached_write!(cache_length, White, pw_len_goto, LENGTH_HEADER, chars.len());
+            if 5 <= term_height {
+                //clean!(pw_len_goto, cache_length);
+                cached_write!(cache_length, Reset, pw_len_goto, LENGTH_HEADER, chars.len());
 
-            if 0 < chars.len() {
-                // write strength
-                //clean!(score_goto, cache_strength);
-                let desc = match score(&mut chars) {
-                    0 => color!(Red, "SUX"),
-                    1 => color!(Red, "VERY BAD"),
-                    2 => color!(Yellow, "BAD"),
-                    3 => color!(White, "GOOD"),
-                    4 => color!(Green, "EXCELLENT"),
-                    _ => unreachable!(),
-                };
-                cached_write!(cache_strength, White, score_goto, STRENGTH_HEADER, desc);
+                if 0 < chars.len() {
+                    // write strength
+                    //clean!(score_goto, cache_strength);
+                    let desc = match score(&mut chars) {
+                        0 => color!(Red, "SUX"),
+                        1 => color!(Red, "VERY BAD"),
+                        2 => color!(Yellow, "BAD"),
+                        3 => color!(Reset, "GOOD"),
+                        4 => color!(Green, "EXCELLENT"),
+                        _ => unreachable!(),
+                    };
+                    cached_write!(cache_strength, Reset, score_goto, STRENGTH_HEADER, desc);
 
-                // write suggestions
-                //clean!(sugg_goto, cache_suggestion);
-                //clean!(warning_goto, cache_warning);
-                let (sugg, warning) = match zxcvbn::zxcvbn(&chars.iter().collect::<String>(), &[])
-                    .unwrap()
-                    .feedback()
-                {
-                    Some(sugg) => (
-                        format!("{}", sugg.suggestions()[0]),
-                        match sugg.warning() {
-                            Some(warning) => format!("{}", warning),
-                            None => String::new(),
-                        },
-                    ),
-                    None => (String::new(), String::new()),
-                };
-                cached_write!(cache_suggestion, Yellow, sugg_goto, SUGGESTION_HEADER, sugg);
-                cached_write!(cache_warning, Yellow, warning_goto, WARNING_HEADER, warning);
+                    // write suggestions
+                    //clean!(sugg_goto, cache_suggestion);
+                    //clean!(warning_goto, cache_warning);
+                    let (sugg, warning) = match zxcvbn::zxcvbn(&chars.iter().collect::<String>(), &[])
+                        .unwrap()
+                        .feedback()
+                    {
+                        Some(sugg) => (
+                            format!("{}", sugg.suggestions()[0]),
+                            match sugg.warning() {
+                                Some(warning) => format!("{}", warning),
+                                None => String::new(),
+                            },
+                        ),
+                        None => (String::new(), String::new()),
+                    };
+                    cached_write!(cache_suggestion, Yellow, sugg_goto, SUGGESTION_HEADER, sugg);
+                    cached_write!(cache_warning, Yellow, warning_goto, WARNING_HEADER, warning);
+                }
             }
         };
     }
@@ -201,7 +202,7 @@ where
             .unwrap()
         };
     }
-    rewrite_prompt!(White, mask_char(true));
+    rewrite_prompt!(Reset, mask_char(true));
 
     let mut is_match = None;
 
@@ -220,7 +221,7 @@ where
                     match new_matches {
                         Some(true) => rewrite_prompt!(Green, mask_char(true)),
                         Some(false) => rewrite_prompt!(Red, mask_char(false)),
-                        None => rewrite_prompt!(White, mask_char(true)),
+                        None => rewrite_prompt!(Reset, mask_char(true)),
                     }
                 }
             }
@@ -245,17 +246,14 @@ where
                         match is_match {
                             Some(true) => color!(Green, "_"),
                             Some(false) => color!(Red, "_"),
-                            None => color!(White, "_"),
+                            None => color!(Reset, "_"),
                         },
                         left!(1)
                     )
                     .unwrap();
                 }
                 chars.pop().unwrap();
-                if 5 <= term_height {
-                    diag!();
-                }
-
+                diag!();
                 color_match!();
             }
             //
@@ -268,15 +266,13 @@ where
                         match is_match {
                             Some(true) => color!(Green, "{}", mask_char(true)),
                             Some(false) => color!(Red, "{}", mask_char(false)),
-                            None => color!(White, "{}", mask_char(true)),
+                            None => color!(Reset, "{}", mask_char(true)),
                         },
                     )
                     .unwrap();
                 }
                 chars.push(chr);
-                if 5 <= term_height {
-                    diag!();
-                }
+                diag!();
                 color_match!();
             }
             //
@@ -297,13 +293,13 @@ where
         ( $x:expr, $y:expr, $str:literal, $arg:expr ) => {
             match ($x ^ $y) % 8 {
                 0 => color!(Black, $str, $arg),
-                1 => color!(Red, $str, $arg),
-                2 => color!(Green, $str, $arg),
-                3 => color!(Yellow, $str, $arg),
-                4 => color!(Blue, $str, $arg),
-                5 => color!(Purple, $str, $arg),
-                6 => color!(Cyan, $str, $arg),
-                7 => color!(White, $str, $arg),
+                1 => color!(Blue, $str, $arg),
+                2 => color!(Cyan, $str, $arg),
+                3 => color!(Green, $str, $arg),
+                4 => color!(Magenta, $str, $arg),
+                5 => color!(Red, $str, $arg),
+                6 => color!(White, $str, $arg),
+                7 => color!(Yellow, $str, $arg),
                 _ => todo!(),
             }
         };
