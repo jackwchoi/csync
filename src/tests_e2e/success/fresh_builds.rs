@@ -4,7 +4,7 @@ use std::{io::Write, path::PathBuf};
 use tempfile::TempDir;
 
 //
-macro_rules! generate_success_body {
+macro_rules! generate_fresh_build_success_test_func {
     //
     ( $fn_name:ident, $pbuf_and_tmpd:expr, $key:literal $(, $arg:literal )* ) => {
         //
@@ -57,16 +57,21 @@ macro_rules! generate_success_body {
 
 // 1. default configs
 // 1. random password
-generate_mod!(default, "08h4eMP5jWCtm09PWFMEK8ND6nAxfv1NrztA4S1t0wFhi3NmRlbFis4ERFyCcKmL");
+generate_mod!(
+    default,
+    generate_fresh_build_success_test_func,
+    "08h4eMP5jWCtm09PWFMEK8ND6nAxfv1NrztA4S1t0wFhi3NmRlbFis4ERFyCcKmL"
+);
 
 // 1. default configs
 // 1. empty password
-generate_mod!(default_empty_password, "");
+generate_mod!(default_empty_password, generate_fresh_build_success_test_func, "");
 
 // 1. `aes256cbc` as the cipher
 // 1. hash strength specified by number of iteration
 generate_mod!(
     aes256cbc_pbkdf2_params,
+    generate_fresh_build_success_test_func,
     "CL9OhnSRp5uOeb1sZWjMulidwLmbFmL89TDo6FQ5vIq325tPiCEDQxzcK9aFC8B9",
     "--cipher aes256cbc",
     "--spread-depth 4",
@@ -78,6 +83,7 @@ generate_mod!(
 // 1. hash strength specified by time
 generate_mod!(
     aes256cbc_pbkdf2_time,
+    generate_fresh_build_success_test_func,
     "zVzfYb4RlAdS8zng8gX7Dq1zADhOEnBxoqk4iwsmKW6oNs7A2dVPOBu9QZeXLU4c",
     "--cipher aes256cbc",
     "--spread-depth 5",
@@ -88,6 +94,7 @@ generate_mod!(
 
 generate_mod!(
     chacha20_scrypt_params_custom_len,
+    generate_fresh_build_success_test_func,
     "AMrSoKIyDByT1kn398swxJOPUYu58b5M98BISjqcvlzpDeKtnFPOD3wULCgDZVHE",
     "--cipher chacha20",
     "--spread-depth 6",
@@ -97,6 +104,7 @@ generate_mod!(
 
 generate_mod!(
     chacha20_scrypt_time,
+    generate_fresh_build_success_test_func,
     "nTn3RoJEVvX8IH5zQZ5LKTJTSBU3ZqsTG9d2TSL2GB1DbTlNzBBaXwPxEu9DRsby",
     "--cipher chacha20",
     "--spread-depth 7",
