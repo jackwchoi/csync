@@ -241,3 +241,6 @@ cargo install csync
 1. better reporting of files that were not able to be synced
 1. better interface for checking `out_dir`
 1. handle symlinks
+1. detect change in permission bits as a change
+1. move all TODO's in code to here
+1. use std::fs::Permissions::readonly instead of unix permbits

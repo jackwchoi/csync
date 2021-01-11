@@ -9,7 +9,8 @@ use tempfile::TempDir;
 use walkdir::{DirEntry, WalkDir};
 
 enum Change {
-    Write(PathBuf),
+    CreateDir(PathBuf),
+    Append(PathBuf),
     Delete(PathBuf),
 }
 
@@ -63,14 +64,14 @@ where
     let change_set_deleted_files: HashSet<_> = change_set
         .iter()
         .filter_map(|c| match c {
-            Change::Write(path) => None,
+            Change::Append(path) | Change::CreateDir(path) => None,
             Change::Delete(path) => Some(path.clone()),
         })
         .collect();
     let change_set_written_files: HashSet<_> = change_set
         .iter()
         .filter_map(|c| match c {
-            Change::Write(path) => Some(path.clone()),
+            Change::Append(path) | Change::CreateDir(path) => Some(path.clone()),
             Change::Delete(path) => None,
         })
         .collect();
@@ -83,75 +84,80 @@ where
     );
 }
 
+fn create_files<P>(root: P, rel_paths: &Vec<&str>)
+where
+    P: AsRef<std::path::Path>,
+{
+    rel_paths
+        .iter()
+        .map(|rel_path| (rel_path.ends_with('/'), root.as_ref().join(rel_path)))
+        .for_each(|(is_dir, full_path)| match is_dir {
+            true => {
+                std::fs::File::create(full_path).unwrap();
+            }
+            false => std::fs::create_dir_all(full_path).unwrap(),
+        });
+}
+
 //
 macro_rules! generate_incremental_build_success_test_func {
-    //
-    ( $fn_name:ident, $root_tmpd:expr, $change_set:expr, $key:literal,  ) => {
+    ( $fn_name:ident, $root_tmpdir:expr, $files_to_create:expr, $change_set:expr, $key:literal ) => {{
+        let root_tmpdir = $root_tmpdir;
+        let files_to_create = $files_to_create;
+        create_files(root_tmpdir.path(), &files_to_create);
 
-    };
-    ( $fn_name:ident, $pbuf_and_tmpd:expr, $key:literal $(, $arg:literal )* ) => {
         //
-        #[test]
-        fn $fn_name() {
-            let (source, _tmpd): (PathBuf, Option<TempDir>) = $pbuf_and_tmpd;
-            let source = &source;
+        let exit_code = 0;
 
-            // pass
-            let exit_code = 0;
+        //
+        let enc_dir = tmpdir!().unwrap();
+        let enc_dir = enc_dir.path();
 
-            // shadow because we don't want move or drop
-            let out_dir = tmpdir!().unwrap();
-            let out_dir = out_dir.path();
+        //
+        let dec_dir_1 = tmpdir!().unwrap();
+        let dec_dir_1 = dec_dir_1.path();
+        //
+        let dec_dir_2 = tmpdir!().unwrap();
+        let dec_dir_2 = dec_dir_1.path();
 
-            // shadow because we don't want move or drop
-            let out_out_dir = tmpdir!().unwrap();
-            let out_out_dir = out_out_dir.path();
+        // same keys, so it shouldn't fail from mismatch
+        let key_1 = $key;
+        let key_2 = key_1;
 
-            // same keys, so it shouldn't fail from mismatch
-            let key_1 = $key;
-            let key_2 = key_1;
+        // encryption checks
+        check_encrypt!(
+            exit_code,
+            source,
+            enc_dir,
+            key_1,
+            key_2,
+            path_as_str!(source),
+            &format!("-o {}", path_as_str!(enc_dir))
+        );
 
-            // encryption checks
-            check_encrypt!(
-                exit_code,
-                source,
-                out_dir,
-                key_1,
-                key_2,
-                path_as_str!(source),
-                &format!("-o {}", path_as_str!(out_dir))
-                $(, $arg )*
-            );
+        // decryption checks
+        check_decrypt!(
+            exit_code,
+            enc_dir,
+            dec_dir_1,
+            source,
+            key_1,
+            key_2,
+            path_as_str!(enc_dir),
+            &format!("-o {}", path_as_str!(dec_dir_1))
+        );
 
-            let hashes_after_first_enc = false;
-
-            // encryption checks
-            check_encrypt!(
-                exit_code,
-                source,
-                out_dir,
-                key_1,
-                key_2,
-                path_as_str!(source),
-                &format!("-o {}", path_as_str!(out_dir))
-                $(, $arg )*
-            );
-
-            let hashes_after_second_enc = false;
-
-            // TODO assert_eq(hashes_after_second_enc);
-
-            // decryption checks
-            check_decrypt!(
-                exit_code,
-                out_dir,
-                out_out_dir,
-                source,
-                key_1,
-                key_2,
-                path_as_str!(out_dir),
-                &format!("-o {}", path_as_str!(out_out_dir))
-            );
-        }
-    };
+        let change_set = $change_set;
+        change_set.iter().for_each(|c| match c {
+            Change::Append(path) => todo!(),
+            Change::CreateDir(path) => todo!(),
+            Change::Delete(path) => match path.exists() {
+                true => match path.is_file() {
+                    true => std::fs::remove_file(path).unwrap(),
+                    false => std::fs::remove_dir_all(path).unwrap(),
+                },
+                false => (),
+            },
+        });
+    }};
 }
