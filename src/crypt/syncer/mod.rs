@@ -315,9 +315,10 @@ impl Syncer {
             SyncerSpec::Encrypt { .. } => {
                 self.check_rep();
 
-                let iter = self.sync_enc_dry()?;
-
-                Ok(iter.map(move |action| action?.manifest(self.arena.path(), &self.derived_key)))
+                // TODO retry number
+                Ok(self
+                    .sync_enc_dry()?
+                    .map(move |action| action?.manifest(self.arena.path(), &self.derived_key)))
             }
             _ => todo!(),
         }
@@ -400,8 +401,9 @@ impl Syncer {
             SyncerSpec::Decrypt { .. } => {
                 self.check_rep();
 
-                let iter = self.sync_dec_dry()?;
-                Ok(iter.map(move |action| action?.manifest(self.arena.path(), &self.derived_key)))
+                Ok(self
+                    .sync_dec_dry()?
+                    .map(move |action| action?.manifest(self.arena.path(), &self.derived_key)))
             }
             _ => {
                 dbg!(&self.spec);
