@@ -1,5 +1,5 @@
-use crate::secure_vec::*;
-use std::io::{stderr, stdin, Write};
+use crate::{hasher::deterministic_hash, prelude::*, secure_vec::*};
+use std::io::Read;
 use termion::{
     color::{self, *},
     cursor,
@@ -43,13 +43,13 @@ const WARNING_HEADER: &str = "Warning: ";
 struct CliFrontEnd<W, F>
 where
     W: std::io::Write,
-    F: Fn(SecureBytes) -> bool,
+    F: Fn(SecureBytes) -> Option<bool>,
 {
+    // term_width: u16,
     border_b: u16,
     border_l: u16,
     border_r: u16,
     border_t: u16,
-    cache_clean: String,
     cache_is_match: Option<bool>,
     cache_length: String,
     cache_strength: String,
@@ -69,17 +69,15 @@ where
     screen: W,
     sugg_goto: cursor::Goto,
     term_height: u16,
-    term_width: u16,
     warning_goto: cursor::Goto,
 }
 
 impl<W, F> CliFrontEnd<W, F>
 where
     W: std::io::Write,
-    F: Fn(SecureBytes) -> bool,
+    F: Fn(SecureBytes) -> Option<bool>,
 {
-
-    fn new(confirm: bool, term_width: u16, term_height: u16, screen: W, key_matches: F) -> Self {
+    pub fn new(confirm: bool, term_width: u16, term_height: u16, screen: W, key_matches: F) -> Self {
         let border_l = proportion!(0.05, term_width);
         let border_r = proportion!(0.95, term_width);
         let border_t = proportion!(0.05, term_height);
@@ -102,11 +100,11 @@ where
 
         //
         Self {
+            // term_width,
             border_b,
             border_l,
             border_r,
             border_t,
-            cache_clean: String::new(),
             cache_is_match: None,
             cache_length: String::new(),
             cache_strength: String::new(),
@@ -126,7 +124,6 @@ where
             screen,
             sugg_goto,
             term_height,
-            term_width,
             warning_goto,
         }
     }
@@ -200,7 +197,7 @@ where
     }
 
     fn diag(&mut self) {
-        if 5 <= self.term_height {
+        if 0 < self.chars.len() && 5 <= self.term_height {
             //clean!(pw_len_goto, cache_length);
             Self::cached_write_color(
                 &mut self.screen,
@@ -240,7 +237,7 @@ where
             };
             Self::cached_write_color(
                 &mut self.screen,
-                &mut self.cache_strength,
+                &mut self.cache_suggestion,
                 Yellow,
                 self.sugg_goto,
                 SUGGESTION_HEADER,
@@ -248,7 +245,7 @@ where
             );
             Self::cached_write_color(
                 &mut self.screen,
-                &mut self.cache_strength,
+                &mut self.cache_warning,
                 Yellow,
                 self.warning_goto,
                 WARNING_HEADER,
@@ -298,52 +295,53 @@ where
     }
 
     fn matches(&self) -> Option<bool> {
-        Some((self.key_matches)(
-            self.chars.iter().copied().collect::<String>().as_bytes().to_vec().into(),
-        ))
+        (self.key_matches)(self.chars.iter().copied().collect::<String>().as_bytes().to_vec().into())
     }
 
     fn color_match(&mut self) {
+        macro_rules! rewrite {
+            ( $color:ident, $mask:literal ) => {
+                Self::rewrite_prompt(
+                    &mut self.screen,
+                    &self.chars,
+                    $color,
+                    self.confirm,
+                    Self::mask_char($mask),
+                    self.prompt_goto,
+                    self.pw_portion_width,
+                )
+            };
+        }
+
         let new_matches = self.matches();
         match self.cache_is_match == new_matches {
             true => (),
             false => {
                 self.cache_is_match = new_matches;
                 match new_matches {
-                    Some(true) => Self::rewrite_prompt(
-                        &mut self.screen,
-                        &self.chars,
-                        Green,
-                        self.confirm,
-                        Self::mask_char(true),
-                        self.prompt_goto,
-                        self.pw_portion_width,
-                    ),
-                    Some(false) => Self::rewrite_prompt(
-                        &mut self.screen,
-                        &self.chars,
-                        Red,
-                        self.confirm,
-                        Self::mask_char(false),
-                        self.prompt_goto,
-                        self.pw_portion_width,
-                    ),
-                    None => Self::rewrite_prompt(
-                        &mut self.screen,
-                        &self.chars,
-                        Reset,
-                        self.confirm,
-                        Self::mask_char(true),
-                        self.prompt_goto,
-                        self.pw_portion_width,
-                    ),
+                    Some(true) => rewrite!(Green, true),
+                    Some(false) => rewrite!(Red, false),
+                    None => rewrite!(Reset, true),
                 }
             }
         }
     }
 
-    fn run(mut self) -> SecureBytes {
-        for key_down in stdin().keys() {
+    pub fn handle_keys(mut self) -> SecureBytes {
+        if 7 <= self.term_height {
+            draw_border(&mut self.screen, self.border_l, self.border_r, self.border_t, self.border_b);
+        }
+
+        Self::rewrite_prompt(
+            &mut self.screen,
+            &self.chars,
+            Reset,
+            self.confirm,
+            Self::mask_char(true),
+            self.prompt_goto,
+            self.pw_portion_width,
+        );
+        for key_down in std::io::stdin().keys() {
             //
             match key_down.unwrap() {
                 //
@@ -355,7 +353,7 @@ where
                 Key::Backspace if 0 < self.chars.len() => {
                     if let Some(goto) = self.goto_backspace() {
                         write!(
-                            self.screen,
+                            &mut self.screen,
                             "{}{}{}{}",
                             goto,
                             left!(1),
@@ -376,7 +374,7 @@ where
                 Key::Char(chr) => {
                     if let Some(goto) = self.goto_asterisk() {
                         write!(
-                            self.screen,
+                            &mut self.screen,
                             "{}{}",
                             goto,
                             match self.cache_is_match {
@@ -402,260 +400,73 @@ where
     }
 }
 
+pub fn get_password(confirm_password: bool) -> CsyncResult<CryptoSecureBytes> {
+    let isatty = isatty::stderr_isatty();
+    let initial = deterministic_hash(match isatty {
+        true => run(false, |_| None),
+        false => {
+            let mut buffer = Vec::new();
+            std::io::stdin().read_to_end(&mut buffer).unwrap();
+
+            match confirm_password {
+                true => {
+                    let newline_indices: Vec<_> = buffer
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, byte)| match *byte == 10u8 {
+                            true => Some(i),
+                            false => None,
+                        })
+                        .collect();
+
+                    match 2 <= newline_indices.len() {
+                        true => {
+                            let second_newline_index = *newline_indices.get(1).unwrap();
+                            let pws = &buffer[..second_newline_index + 1];
+                            let pw_len = pws.len() / 2;
+                            match &pws[..pw_len] == &pws[pw_len..] {
+                                true => (&pws[..pw_len])
+                                    .into_iter()
+                                    .copied()
+                                    .filter(|byte| *byte != 10u8)
+                                    .collect::<Vec<_>>()
+                                    .into(),
+                                false => csync_err!(PasswordConfirmationFail)?,
+                            }
+                        }
+                        false => csync_err!(PasswordConfirmationFail)?,
+                    }
+                }
+                false => buffer.into_iter().take_while(|byte| *byte != 10u8).collect::<Vec<_>>().into(),
+            }
+        }
+    });
+
+    match confirm_password && isatty {
+        true => {
+            let confirm = deterministic_hash(run(true, |k| Some(deterministic_hash(k) == initial)));
+            // constant time comparison
+            match initial == confirm {
+                true => Ok(initial),
+                false => csync_err!(PasswordConfirmationFail),
+            }
+        }
+        false => Ok(initial),
+    }
+}
+
 // TODO refactor
 //
 // too long
-pub fn run<F>(confirm: bool, key_matches: F) -> SecureBytes
+fn run<F>(confirm: bool, key_matches: F) -> SecureBytes
 where
     F: Fn(SecureBytes) -> Option<bool>,
 {
-    if !isatty::stderr_isatty() {
-        todo!();
-    }
-
-    // console has a way to see if stderr is attended
-    // use that as the main gateway or tty
-
     let (term_width, term_height) = termion::terminal_size().unwrap();
+    let stderr = std::io::stderr().into_raw_mode().unwrap();
+    let screen = AlternateScreen::from(stderr);
 
-    let border_l = proportion!(0.05, term_width);
-    let border_r = proportion!(0.95, term_width);
-    let border_t = proportion!(0.05, term_height);
-    let border_b = proportion!(0.95, term_height);
-
-    let stderr = stderr().into_raw_mode().unwrap();
-
-    let mut screen = AlternateScreen::from(stderr);
-
-    //
-    let mid = proportion!(0.5, term_height);
-
-    let enter_message_len = 23;
-    let prompt_width = proportion!(0.7, term_width);
-    let pw_portion_width = prompt_width - enter_message_len;
-
-    let prompt_x = (term_width - prompt_width) / 2;
-    let prompt_y = mid - 2;
-    let prompt_goto = goto!(prompt_x, prompt_y);
-    let pw_len_goto = goto!(prompt_x, mid - 1);
-    let score_goto = goto!(prompt_x, mid);
-    let warning_goto = goto!(prompt_x, mid + 1);
-    let sugg_goto = goto!(prompt_x, mid + 2);
-
-    let mut chars = Vec::with_capacity(1024);
-
-    let goto_backspace = |chars: &mut Vec<char>| match chars.len() {
-        0 => None,
-        len if len <= pw_portion_width as usize => Some(goto!(prompt_x + enter_message_len + len as u16, prompt_y)),
-        _ => None,
-    };
-    //
-    let goto_asterisk = |chars: &mut Vec<char>| match chars.len() {
-        len if len < pw_portion_width as usize => Some(goto!(prompt_x + enter_message_len + len as u16, prompt_y)),
-        _ => None,
-    };
-
-    // TODO refactor later
-    let score = |chars: &mut Vec<char>| zxcvbn::zxcvbn(&chars.iter().collect::<String>(), &[]).unwrap().score();
-
-    // cache
-    macro_rules! cached_write {
-        ( $cache:ident, $cache_check:block, $if_stale:block, $fmt_str:literal $( , $arg:expr )* ) => {{
-            let content = format!("{}", format!($fmt_str, $( $arg ),*));
-            if $cache != content && $cache_check {
-                $cache = content;
-                write!(screen, "{}", $cache).unwrap();
-                $if_stale;
-            }
-        }};
-        ( $cache:ident, $color:ident, $goto:expr, $header:expr, $desc:expr ) => {{
-            let uncolored_content = format!("{}{:>23}{}", $goto, $header, $desc);
-            if $cache != uncolored_content {
-
-                clean!($goto, $cache);
-
-                $cache = uncolored_content;
-                let colored_content = color!($color, "{}", $cache);
-                write!(screen, "{}", colored_content).unwrap();
-            }
-        }}
-    }
-
-    let mut cache_clean = String::new();
-    macro_rules! clean {
-        ( $goto:expr, $content_cache:ident ) => {
-            cached_write!(
-                cache_clean,
-                { 0 < $content_cache.len() },
-                { $content_cache.clear() },
-                "{}{}",
-                $goto,
-                (0..$content_cache.len()).map(|_| ' ').collect::<String>()
-            )
-        };
-    }
-
-    let mut cache_length = String::new();
-    let mut cache_strength = String::new();
-    let mut cache_suggestion = String::new();
-    let mut cache_warning = String::new();
-    macro_rules! diag {
-        () => {
-            if 5 <= term_height {
-                //clean!(pw_len_goto, cache_length);
-                cached_write!(cache_length, Reset, pw_len_goto, LENGTH_HEADER, chars.len());
-
-                if 0 < chars.len() {
-                    // write strength
-                    //clean!(score_goto, cache_strength);
-                    let desc = match score(&mut chars) {
-                        0 => color!(Red, "SUX"),
-                        1 => color!(Red, "VERY BAD"),
-                        2 => color!(Yellow, "BAD"),
-                        3 => color!(Reset, "GOOD"),
-                        4 => color!(Green, "EXCELLENT"),
-                        _ => unreachable!(),
-                    };
-                    cached_write!(cache_strength, Reset, score_goto, STRENGTH_HEADER, desc);
-
-                    // write suggestions
-                    //clean!(sugg_goto, cache_suggestion);
-                    //clean!(warning_goto, cache_warning);
-                    let (sugg, warning) = match zxcvbn::zxcvbn(&chars.iter().collect::<String>(), &[])
-                        .unwrap()
-                        .feedback()
-                    {
-                        Some(sugg) => (
-                            format!("{}", sugg.suggestions()[0]),
-                            match sugg.warning() {
-                                Some(warning) => format!("{}", warning),
-                                None => String::new(),
-                            },
-                        ),
-                        None => (String::new(), String::new()),
-                    };
-                    cached_write!(cache_suggestion, Yellow, sugg_goto, SUGGESTION_HEADER, sugg);
-                    cached_write!(cache_warning, Yellow, warning_goto, WARNING_HEADER, warning);
-                }
-            }
-        };
-    }
-
-    if 7 <= term_height {
-        draw_border(&mut screen, border_l, border_r, border_t, border_b);
-    }
-
-    let mask_char = |matches| match matches {
-        true => '\u{2713}',
-        false => '\u{10102}',
-    };
-    macro_rules! rewrite_prompt {
-        ( $color:ident, $mask:expr ) => {
-            write!(
-                screen,
-                "{}{}",
-                prompt_goto,
-                color!(
-                    $color,
-                    "{}{}",
-                    format!(
-                        "{:>23}{}{}",
-                        match confirm {
-                            true => CONFIRM_HEADER,
-                            false => ENTER_HEADER,
-                        },
-                        (0..chars.len()).map(|_| $mask).collect::<String>(),
-                        (chars.len()..pw_portion_width as usize)
-                            .map(|_| '_')
-                            .collect::<String>()
-                    ),
-                    left!(pw_portion_width)
-                )
-            )
-            .unwrap()
-        };
-    }
-    rewrite_prompt!(Reset, mask_char(true));
-
-    let mut is_match = None;
-
-    macro_rules! matches {
-        () => {
-            key_matches(chars.iter().copied().collect::<String>().as_bytes().to_vec().into())
-        };
-    }
-    macro_rules! color_match {
-        (  ) => {{
-            let new_matches = matches!();
-            match is_match == new_matches {
-                true => (),
-                false => {
-                    is_match = new_matches;
-                    match new_matches {
-                        Some(true) => rewrite_prompt!(Green, mask_char(true)),
-                        Some(false) => rewrite_prompt!(Red, mask_char(false)),
-                        None => rewrite_prompt!(Reset, mask_char(true)),
-                    }
-                }
-            }
-        }};
-    }
-    for key_down in stdin().keys() {
-        //
-        match key_down.unwrap() {
-            //
-            Key::Char('\n') => break,
-            //
-            Key::Ctrl('c') => panic!(),
-
-            //
-            Key::Backspace if 0 < chars.len() => {
-                if let Some(goto) = goto_backspace(&mut chars) {
-                    write!(
-                        screen,
-                        "{}{}{}{}",
-                        goto,
-                        left!(1),
-                        match is_match {
-                            Some(true) => color!(Green, "_"),
-                            Some(false) => color!(Red, "_"),
-                            None => color!(Reset, "_"),
-                        },
-                        left!(1)
-                    )
-                    .unwrap();
-                }
-                chars.pop().unwrap();
-                diag!();
-                color_match!();
-            }
-            //
-            Key::Char(chr) => {
-                if let Some(goto) = goto_asterisk(&mut chars) {
-                    write!(
-                        screen,
-                        "{}{}",
-                        goto,
-                        match is_match {
-                            Some(true) => color!(Green, "{}", mask_char(true)),
-                            Some(false) => color!(Red, "{}", mask_char(false)),
-                            None => color!(Reset, "{}", mask_char(true)),
-                        },
-                    )
-                    .unwrap();
-                }
-                chars.push(chr);
-                diag!();
-                color_match!();
-            }
-            //
-            _ => (),
-        }
-    }
-
-    screen.flush().unwrap();
-
-    chars.into_iter().collect::<String>().as_bytes().to_vec().into()
+    CliFrontEnd::new(confirm, term_width, term_height, screen, key_matches).handle_keys()
 }
 
 fn draw_border<W>(screen: &mut W, border_l: u16, border_r: u16, border_t: u16, border_b: u16)

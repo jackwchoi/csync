@@ -1,0 +1,5 @@
+    Finished dev [optimized + debuginfo] target(s) in 0.13s
+     Running `target/debug/csync encrypt src -o tmp`
+[src/cli.rs:424] &buffer = "abc\n"
+[src/cli.rs:424] &buffer = ""
+[38;5;1m[csync error][39m: Could not confirm password

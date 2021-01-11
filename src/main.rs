@@ -218,20 +218,7 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
     };
     //let init_key = get_password(confirm_password)?;
 
-    let init_key = {
-        let initial = deterministic_hash(cli::run(false, |_| None));
-        match confirm_password {
-            true => {
-                let confirm = deterministic_hash(cli::run(true, |k| Some(deterministic_hash(k) == initial)));
-                // constant time comparison
-                match initial == confirm {
-                    true => Ok(initial),
-                    false => csync_err!(PasswordConfirmationFail),
-                }
-            }
-            false => Ok(initial),
-        }
-    }?;
+    let init_key = cli::get_password(confirm_password)?;
     // TODO do an initial scan to get file count and size count to get an approxdmate duration?
 
     //

@@ -25,7 +25,7 @@ macro_rules! generate_fresh_build_success_test_func {
             let out_out_dir = out_out_dir.path();
 
             // same keys, so it shouldn't fail from mismatch
-            let key_1 = "0LJov4GYGMPUvzQSuxcap3guApyhB3KM";
+            let key_1 = $key;
             let key_2 = key_1;
 
             // encryption checks
