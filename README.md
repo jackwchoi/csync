@@ -244,3 +244,4 @@ cargo install csync
 1. detect change in permission bits as a change
 1. move all TODO's in code to here
 1. use std::fs::Permissions::readonly instead of unix permbits
+1. don't show diag when decrypting

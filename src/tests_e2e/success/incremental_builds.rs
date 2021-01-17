@@ -1,24 +1,20 @@
 use crate::{fs_util::*, prelude::*, test_util::*, tests_e2e::success::util::*, util::*};
-use itertools::Itertools;
+use colmac::*;
+use itertools::{Either, Itertools};
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
     path::PathBuf,
+    time::{Duration, Instant, SystemTime},
 };
 use tempfile::TempDir;
 use walkdir::{DirEntry, WalkDir};
 
+#[derive(PartialEq, Eq, Hash)]
 enum Change {
     CreateDir(PathBuf),
     Append(PathBuf),
     Delete(PathBuf),
-}
-
-fn find<P>(root: P) -> impl Iterator<Item = PathBuf>
-where
-    P: AsRef<std::path::Path>,
-{
-    WalkDir::new(root).into_iter().map(Result::unwrap).map(DirEntry::into_path)
 }
 
 // REQUIREMENTS: incremental build
@@ -32,18 +28,22 @@ where
 // 1. take as an arg HashMap<PathBuf, Change>, specifying the changes to take place after initial
 //    encryption but before incremental encryption
 // 1. after initial encryption, decrypt to a dir
-// 1. after changes and incremental encryption, decrypt to a different dir
-// 1. check that the initial change spec matches the diff between the 2 decryption dirs
 
 // check that change_set correctly takes dec_dir_1 to dec_dir_2
-fn assert_change_set<P1, P2>(change_set: HashSet<Change>, dec_dir_1: P1, dec_dir_2: P2)
-where
+fn assert_change_set<P1, P2>(
+    change_set: HashSet<Change>,
+    dec_dir_1: P1,
+    dec_dir_1_snapshot: (Instant, HashSet<PathBuf>),
+    dec_dir_2: P2,
+    dec_dir_2_snapshot: (Instant, HashSet<PathBuf>),
+) where
     P1: AsRef<std::path::Path>,
     P2: AsRef<std::path::Path>,
 {
+    /*
     //
-    let dir_1_files: HashSet<_> = find(&dec_dir_1).map(|pbuf| subpath(&pbuf, &dec_dir_1).unwrap()).collect();
-    let dir_2_files: HashSet<_> = find(&dec_dir_2).map(|pbuf| subpath(&pbuf, &dec_dir_2).unwrap()).collect();
+    let dir_1_files: HashSet<_> = dec_dir_1_snapshot.1.iter().map(|pbuf| subpath(&pbuf, &dec_dir_1).unwrap()).collect();
+    let dir_2_files: HashSet<_> = dec_dir_2_snapshot.1.iter().map(|pbuf| subpath(&pbuf, &dec_dir_2).unwrap()).collect();
 
     //
     let deleted_files: HashSet<_> = dir_1_files.difference(&dir_2_files).cloned().collect();
@@ -82,8 +82,10 @@ where
         created_files.union(&changed_files).cloned().collect::<HashSet<_>>(),
         change_set_deleted_files
     );
+    */
 }
 
+//
 fn create_files<P>(root: P, rel_paths: &Vec<&str>)
 where
     P: AsRef<std::path::Path>,
@@ -92,72 +94,284 @@ where
         .iter()
         .map(|rel_path| (rel_path.ends_with('/'), root.as_ref().join(rel_path)))
         .for_each(|(is_dir, full_path)| match is_dir {
-            true => {
-                std::fs::File::create(full_path).unwrap();
+            true => std::fs::create_dir_all(full_path).unwrap(),
+            false => {
+                std::fs::create_dir_all(full_path.parent().unwrap()).unwrap();
+                std::fs::File::create(dbg!(full_path)).unwrap();
             }
-            false => std::fs::create_dir_all(full_path).unwrap(),
         });
 }
 
-//
+struct Snapshot {
+    pub time: Instant,
+    pub files: HashSet<PathBuf>,
+}
+
+fn snapshot<P>(root: P) -> Snapshot
+where
+    P: AsRef<std::path::Path>,
+{
+    Snapshot {
+        time: Instant::now(),
+        files: WalkDir::new(root)
+            .into_iter()
+            .map(Result::unwrap)
+            .map(DirEntry::into_path)
+            .collect(),
+    }
+}
+
+fn csync_files<P>(root: P) -> impl Iterator<Item = walkdir::DirEntry>
+where
+    P: AsRef<std::path::Path>,
+{
+    WalkDir::new(&root)
+        .into_iter()
+        .map(Result::unwrap)
+        .filter(|de| de.file_type().is_file())
+        .filter_map(|de| match de.path().extension() == Some(std::ffi::OsStr::new(FILE_SUFFIX)) {
+            true => Some(de),
+            false => None,
+        })
+}
+
+// 1. encrypt source -> out_dir
+// 1. decrypt out_dir -> dec_dir
+// 1. make changes based on change_set, to source
+// 1. incremental encrypt to out_dir
+// 1. detect created/changed files in out_dir
+// 1. create out_dir_new with just the created-changed files
+// 1. decrypt out_dir_new to dec_dir_new and verify change
+// 1. verify deleted files
 macro_rules! generate_incremental_build_success_test_func {
-    ( $fn_name:ident, $root_tmpdir:expr, $files_to_create:expr, $change_set:expr, $key:literal ) => {{
-        let root_tmpdir = $root_tmpdir;
-        let files_to_create = $files_to_create;
-        create_files(root_tmpdir.path(), &files_to_create);
+    ( $fn_name:ident, $root_tmpdir:expr, $files_to_create:expr, $rel_change_set:expr, $key:literal ) => {
+        #[test]
+        fn $fn_name() {
+            let root_tmpdir = $root_tmpdir;
+            let files_to_create = $files_to_create;
+            create_files(root_tmpdir.path(), &files_to_create);
 
-        //
-        let exit_code = 0;
+            //
+            let exit_code = 0;
 
-        //
-        let enc_dir = tmpdir!().unwrap();
-        let enc_dir = enc_dir.path();
+            //
+            let source = tmpdir!().unwrap();
+            let source = source.path();
 
-        //
-        let dec_dir_1 = tmpdir!().unwrap();
-        let dec_dir_1 = dec_dir_1.path();
-        //
-        let dec_dir_2 = tmpdir!().unwrap();
-        let dec_dir_2 = dec_dir_1.path();
+            //
+            let out_dir = tmpdir!().unwrap();
+            let out_dir = out_dir.path();
+            //
+            let dec_dir_1 = tmpdir!().unwrap();
+            let dec_dir_1 = dec_dir_1.path();
 
-        // same keys, so it shouldn't fail from mismatch
-        let key_1 = $key;
-        let key_2 = key_1;
+            // same keys, so it shouldn't fail from mismatch
+            let key_1 = $key;
+            let key_2 = key_1;
 
-        // encryption checks
-        check_encrypt!(
-            exit_code,
-            source,
-            enc_dir,
-            key_1,
-            key_2,
-            path_as_str!(source),
-            &format!("-o {}", path_as_str!(enc_dir))
-        );
+            macro_rules! encrypt {
+                () => {
+                    check_encrypt!(
+                        exit_code,
+                        &source,
+                        &out_dir,
+                        key_1,
+                        key_2,
+                        path_as_str!(source),
+                        &format!("-o {}", path_as_str!(&out_dir))
+                    )
+                };
+            }
+            macro_rules! decrypt {
+                ( $original:expr, $out_dir:expr, $dec_dir:expr ) => {
+                    check_decrypt!(
+                        exit_code,
+                        &$out_dir,
+                        &$dec_dir,
+                        &$original,
+                        key_1,
+                        key_2,
+                        path_as_str!(&$out_dir),
+                        &format!("-o {}", path_as_str!(&$dec_dir))
+                    )
+                };
+            }
 
-        // decryption checks
-        check_decrypt!(
-            exit_code,
-            enc_dir,
-            dec_dir_1,
-            source,
-            key_1,
-            key_2,
-            path_as_str!(enc_dir),
-            &format!("-o {}", path_as_str!(dec_dir_1))
-        );
+            // initial encryption from `source` -> `out_dir`
+            encrypt!();
+            let out_dir_snapshot = snapshot(&out_dir);
 
-        let change_set = $change_set;
-        change_set.iter().for_each(|c| match c {
-            Change::Append(path) => todo!(),
-            Change::CreateDir(path) => todo!(),
-            Change::Delete(path) => match path.exists() {
-                true => match path.is_file() {
-                    true => std::fs::remove_file(path).unwrap(),
-                    false => std::fs::remove_dir_all(path).unwrap(),
+            decrypt!(source, out_dir, dec_dir_1);
+            let dec_dir_1_snapshot = snapshot(&dec_dir_1);
+
+            let time_after_initial_enc = SystemTime::now();
+
+            // sleep some after the thread, not sure if this is actually effective though
+            std::thread::sleep(Duration::from_secs(2));
+
+            // change set with relative paths
+            let rel_change_set = $rel_change_set;
+            // change set with absolute paths
+            let change_set: HashSet<_> = rel_change_set
+                .iter()
+                .map(|c| match c {
+                    Change::Append(path) => Change::Append(root_tmpdir.path().join(path)),
+                    Change::CreateDir(path) => Change::CreateDir(root_tmpdir.path().join(path)),
+                    Change::Delete(path) => Change::Delete(root_tmpdir.path().join(path)),
+                })
+                .collect();
+            // actually perform the changes
+            change_set.iter().for_each(|c| match c {
+                // write some random data to the file
+                Change::Append(path) => {
+                    write!(
+                        std::fs::OpenOptions::new().append(true).open(path).unwrap(),
+                        "c9Z7fHoHRrhFYbbVitnaUoPJjC7siehUXIv6CZEWYaEwAOlJdHODR2a6Mjz8LZdT"
+                    )
+                    .unwrap();
+                }
+                // just create the dir
+                Change::CreateDir(path) => std::fs::create_dir_all(path).unwrap(),
+                // delete
+                Change::Delete(path) => match path.exists() {
+                    true => match path.is_file() {
+                        true => std::fs::remove_file(path).unwrap(),
+                        false => std::fs::remove_dir_all(path).unwrap(),
+                    },
+                    false => (),
                 },
-                false => (),
-            },
-        });
-    }};
+            });
+
+            // incremental encryption from `source` -> `out_dir`
+            encrypt!();
+
+            // decrypt the incrementally encrypted result to a different directory
+            // to check that deleted files are correctly reflected
+            {
+                //
+                let dec_dir_2 = tmpdir!().unwrap();
+                let dec_dir_2 = dec_dir_2.path();
+
+                //
+                decrypt!(source, out_dir, dec_dir_2);
+
+                // check to see if the deletions are reflected
+                let dec_dir_2_snapshot = snapshot(&dec_dir_2);
+                let deleted_files_actual: HashSet<_> = dec_dir_1_snapshot.files.difference(&dec_dir_2_snapshot.files).collect();
+                let deleted_files_expect: HashSet<_> = change_set
+                    .iter()
+                    .filter_map(|c| match c {
+                        Change::Delete(path) => Some(path),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(deleted_files_actual, deleted_files_expect);
+            }
+            // now `source` and `out_dir` only contain newly created and modified files
+
+            // look through `out_dir` and separate files into two sets:
+            // 1. those that were modified after `time_after_initial_enc`
+            // 2. those that were modified before
+            let (unchanged, changed): (HashSet<_>, HashSet<_>) = csync_files(&out_dir)
+                .map(|de| {
+                    let metadata = de.metadata().unwrap();
+                    let pbuf = de.into_path();
+                    (metadata.modified().unwrap(), pbuf)
+                })
+                .partition_map(|(modified, pbuf)| match time_after_initial_enc < modified {
+                    true => Either::Right(subpath(pbuf, &out_dir).unwrap()),
+                    false => Either::Left(subpath(pbuf, &out_dir).unwrap()),
+                });
+
+            // create a dir that contains all files from `source` that have been modified
+            // during the incremental encryption
+            //
+            // `cp -r "$source" "$original_w_modified_files"`
+            let original_w_modified_files = tmpdir!().unwrap();
+            let original_w_modified_files = original_w_modified_files
+                .path()
+                .join("316mqlHdMwUmCNXgGcm4t9uVzeL9AxzU");
+            cp_r(&source, &original_w_modified_files);
+            // collect only the created and modified files
+            let modified_files: HashSet<_> = rel_change_set
+                .iter()
+                .filter_map(|c| match c {
+                    Change::CreateDir(rel_path) | Change::Append(rel_path) => {
+                        // workaround the type system
+                        Some(
+                            original_w_modified_files
+                                .join(rel_path)
+                                .ancestors()
+                                .map(std::path::Path::to_path_buf)
+                                .collect::<Vec<_>>(),
+                        )
+                    }
+                    _ => None,
+                })
+                .flat_map(|vec| vec.into_iter())
+                .collect();
+            // delete all deleted files, so that `original_w_modified_files` only contains
+            // created and modified files
+            WalkDir::new(&original_w_modified_files)
+                .contents_first(true)
+                .into_iter()
+                .map(Result::unwrap)
+                .map(DirEntry::into_path)
+                .for_each(|pbuf| match (modified_files.contains(pbuf.as_path()), pbuf.is_file()) {
+                    (true, _) => (),
+                    (false, true) => std::fs::remove_file(&pbuf).unwrap(),
+                    (false, false) => std::fs::remove_dir(&pbuf).unwrap(),
+                });
+
+            //
+            let out_dir_w_modified_files = tmpdir!().unwrap();
+            let out_dir_w_modified_files = out_dir_w_modified_files.path().join("VQk7fteKLaXXX66sFjTUwip4Oj2AjIUl");
+            cp_r(&out_dir, &out_dir_w_modified_files);
+            csync_files(&out_dir_w_modified_files).for_each(|de| {
+                let pbuf = de.into_path();
+                let rel_path = subpath(pbuf, &out_dir_w_modified_files).unwrap();
+                if !changed.contains(&rel_path) {
+                    std::fs::remove_file(&rel_path).unwrap();
+                }
+            });
+
+            let x = tmpdir!().unwrap();
+            let x = x.path();
+            // decrypt this, and it should only contain newly created / modified files
+            decrypt!(original_w_modified_files, out_dir_w_modified_files, x);
+        }
+    };
+}
+
+macro_rules! append {
+    ( $path:literal ) => {
+        Change::Append(PathBuf::from($path))
+    }
+}
+macro_rules! create {
+    ( $path:literal ) => {
+        Change::CreateDir(PathBuf::from($path))
+    }
+}
+macro_rules! delete {
+    ( $path:literal ) => {
+        Change::Delete(PathBuf::from($path))
+    }
+}
+
+generate_incremental_build_success_test_func!(
+    delete_file,
+    tmpdir!().unwrap(),
+    vec!["d1/", "d1/d2/", "d1/d2/f1", "d1/d2/f2", "d1/f3"],
+    hashset![delete!("d1/f3")],
+    "80G3L0ybIYpzgdHbFS3YXGCvCi1e8Tc0stuQ26T8T7mKvttF0wxvoMcYNRiFSpKJ"
+);
+
+#[test]
+fn created_files_are_detected() {
+    todo!();
+}
+#[test]
+fn changed_files_are_detected() {
+    todo!();
 }

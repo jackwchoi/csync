@@ -134,7 +134,7 @@ where
 }
 
 ///
-fn cp_r<P1, P2>(src: P1, out_dir: P2)
+pub fn cp_r<P1, P2>(src: P1, out_dir: P2)
 where
     P1: AsRef<Path>,
     P2: AsRef<Path>,
