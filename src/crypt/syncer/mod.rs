@@ -196,23 +196,6 @@ impl Syncer {
                 match Syncer::from_dir(spec_ext, &init_key) {
                     //
                     Ok(syncer) => {
-                        // TODO delete
-                        let decrypt_spec = syncer.get_spec().inverse().unwrap();
-                        // TODO reuse derived key
-                        let derived_key = syncer.derived_key.clone();
-                        let decryptor = Syncer::with_spec(decrypt_spec, init_key.clone(), Some(derived_key))?;
-                        decryptor.sync_dec_dry()?.for_each(|action_res| match action_res.unwrap() {
-                            Action::Encode {
-                                dest,
-                                src,
-                                action_spec,
-                                syncer_spec,
-                                file_type,
-                            } => {
-                                dbg!(&src, &dest, src.exists(), dest.exists());
-                            }
-                        });
-
                         //
                         if *verbose {
                             eprintln!("Metadata recovered: csync will use this instead of provided options.");
@@ -243,7 +226,6 @@ impl Syncer {
 
     //
     fn with_spec(spec: SyncerSpec, init_key: InitialKey, derived_key_opt: Option<DerivedKey>) -> CsyncResult<Self> {
-        eprint!("{}", report_syncer_spec(&spec));
         match &spec {
             //
             SyncerSpec::Clean { .. } => todo!(),
@@ -267,22 +249,18 @@ impl Syncer {
                 }
 
                 debug_assert!(is_canonical(source).unwrap());
-                debug_assert!(is_canonical(out_dir).unwrap());
-
-                // do this here because canonicalization requires the path to exist
-                // std::fs::create_dir_all(&out_dir)?;
-                check_out_dir(&out_dir, &spec)?;
+                //debug_assert!(is_canonical(out_dir).unwrap());
 
                 let source = source.canonicalize()?.to_path_buf();
-                let out_dir = out_dir.canonicalize()?.to_path_buf();
+                //let out_dir = out_dir.canonicalize()?.to_path_buf();
 
                 match source.file_name() {
                     //
                     None => csync_err!(SourceDoesNotHaveFilename, source.to_path_buf()),
                     //
-                    Some(_) if source == out_dir => csync_err!(SourceEqOutdir, source),
+                    //Some(_) if source == out_dir => csync_err!(SourceEqOutdir, source),
                     //
-                    _ => {
+                    Some(_) => {
                         let derived_key = match derived_key_opt {
                             Some(derived_key) => derived_key,
                             None => time!(*verbose, "Generating a derived key", key_deriv_spec.derive(&init_key.0 .0)?).0,
@@ -303,9 +281,11 @@ impl Syncer {
     /// 1. for the root cfile,
     ///
     pub fn sync_enc<'a>(&'a self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>> + 'a> {
+        eprint!("{}", report_syncer_spec(&self.spec));
         match &self.spec {
-            SyncerSpec::Encrypt { .. } => {
+            SyncerSpec::Encrypt { out_dir, .. } => {
                 self.check_rep();
+                check_out_dir(&out_dir, &self.spec)?;
 
                 // TODO retry number
                 Ok(self
@@ -328,9 +308,29 @@ impl Syncer {
                 ..
             } => {
                 self.check_rep();
-                check_out_dir(out_dir, &self.spec)?;
 
-                Ok(meta_map(source).filter_map(move |meta_res| match meta_res {
+                // TODO delet
+                let decrypt_spec = inverse_spec(&self.spec).unwrap();
+                // TODO reuse derived key
+                let derived_key = self.derived_key.clone();
+                let decryptor = Syncer::with_spec(decrypt_spec, self.init_key.clone(), Some(derived_key))?;
+                let deleting_actions = decryptor.sync_dec_dry()?.filter_map(|action_res| match action_res.unwrap() {
+                    Action::Encode {
+                        dest,
+                        src,
+                        action_spec,
+                        syncer_spec,
+                        file_type,
+                    } => match dest.exists() {
+                        true => None,
+                        false => Some(Ok(
+                            
+                                )),
+                    },
+                });
+
+                //
+                let other_actions = meta_map(source).filter_map(move |meta_res| match meta_res {
                     Ok((_, src_pbuf, perms, src_modtime, file_type)) => {
                         let spread = match path_to_spread(*spread_depth, &init_salt, &src_pbuf) {
                             Ok(x) => x,
@@ -381,7 +381,8 @@ impl Syncer {
                         }
                     }
                     Err(err) => Some(Err(err)),
-                }))
+                });
+                Ok(deleting_actions.chain(other_actions))
             }
             _ => todo!(),
         }
@@ -389,9 +390,11 @@ impl Syncer {
 
     ///
     pub fn sync_dec<'a>(&'a self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>> + 'a> {
+        eprint!("{}", report_syncer_spec(&self.spec));
         match &self.spec {
-            SyncerSpec::Decrypt { .. } => {
+            SyncerSpec::Decrypt { out_dir, .. } => {
                 self.check_rep();
+                check_out_dir(&out_dir, &self.spec)?;
 
                 Ok(self
                     .sync_dec_dry()?
@@ -415,7 +418,6 @@ impl Syncer {
                 ..
             } => {
                 self.check_rep();
-                check_out_dir(out_dir, &self.spec)?;
 
                 Ok(WalkDir::new(source)
                     .into_iter()
@@ -478,5 +480,38 @@ fn load_syncer_action_spec(source: &Path) -> CsyncResult<(SyncerSpec, ActionSpec
             }
         }
         false => csync_err!(ControlFlow),
+    }
+}
+//
+fn inverse_spec(spec: &SyncerSpec) -> Option<SyncerSpec> {
+    match spec.clone() {
+        //
+        SyncerSpec::Encrypt {
+            authenticator_spec,
+            cipher_spec,
+            compressor_spec,
+            init_salt,
+            key_deriv_spec,
+            out_dir,
+            salt_len,
+            source,
+            spread_depth,
+            verbose,
+        } => Some(SyncerSpec::Decrypt {
+            //
+            out_dir: source.parent().unwrap().to_path_buf(),
+            source: out_dir,
+            //
+            authenticator_spec,
+            cipher_spec,
+            compressor_spec,
+            init_salt,
+            key_deriv_spec,
+            salt_len,
+            spread_depth,
+            verbose,
+        }),
+        //
+        SyncerSpec::Decrypt { .. } | SyncerSpec::Clean { .. } => None,
     }
 }

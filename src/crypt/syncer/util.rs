@@ -182,6 +182,12 @@ pub fn check_out_dir(out_dir: &Path, spec: &SyncerSpec) -> CsyncResult<()> {
     match out_dir.exists() {
         //
         true if out_dir.is_dir() => match spec {
+            SyncerSpec::Encrypt { source, .. } | SyncerSpec::Decrypt { source, .. } | SyncerSpec::Clean { source, .. }
+                if source.canonicalize().unwrap() == out_dir.canonicalize().unwrap() =>
+            {
+                csync_err!(SourceEqOutdir, source.to_path_buf())?
+            }
+
             SyncerSpec::Encrypt { .. } => Ok(()),
             SyncerSpec::Decrypt { .. } => match read_dir(out_dir)?.count() {
                 //
@@ -194,7 +200,7 @@ pub fn check_out_dir(out_dir: &Path, spec: &SyncerSpec) -> CsyncResult<()> {
         //
         true => csync_err!(OutdirIsNotDir, out_dir.to_path_buf()),
         //
-        false => Ok(()),
+        false => csync_err!(OutdirIsNotDir, out_dir.to_path_buf()),
     }
 }
 
