@@ -358,3 +358,8 @@ fn source_does_not_have_filename() {
         &format!("-o {}", path_as_str!(&out_dir.path()))
     );
 }
+
+#[test]
+fn todo_1() {
+    panic!("incremental encryption to a csync dir with different password is auth fail");
+}

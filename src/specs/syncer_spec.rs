@@ -47,6 +47,63 @@ pub enum SyncerSpec {
     },
 }
 
+impl SyncerSpec {
+    pub fn inverse(&self) -> Option<Self> {
+        match self.clone() {
+            //
+            SyncerSpec::Encrypt {
+                authenticator_spec,
+                cipher_spec,
+                compressor_spec,
+                key_deriv_spec,
+                out_dir,
+                source,
+                init_salt,
+                spread_depth,
+                verbose,
+                salt_len,
+            } => Some(SyncerSpec::Decrypt {
+                authenticator_spec,
+                cipher_spec,
+                compressor_spec,
+                key_deriv_spec,
+                out_dir,
+                source,
+                init_salt,
+                spread_depth,
+                verbose,
+                salt_len,
+            }),
+            //
+            SyncerSpec::Decrypt {
+                authenticator_spec,
+                cipher_spec,
+                compressor_spec,
+                key_deriv_spec,
+                out_dir,
+                source,
+                init_salt,
+                spread_depth,
+                verbose,
+                salt_len,
+            } => Some(SyncerSpec::Encrypt {
+                authenticator_spec,
+                cipher_spec,
+                compressor_spec,
+                key_deriv_spec,
+                out_dir,
+                source,
+                init_salt,
+                spread_depth,
+                verbose,
+                salt_len,
+            }),
+            //
+            SyncerSpec::Clean { .. } => None,
+        }
+    }
+}
+
 impl std::convert::TryFrom<&SyncerSpecExt> for SyncerSpec {
     type Error = CsyncErr;
 
