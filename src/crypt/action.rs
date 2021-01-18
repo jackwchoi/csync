@@ -17,12 +17,14 @@ use std::{
 ///
 /// `src` and `dest` are guarantede to be unique
 #[derive(Debug)]
-pub struct Action<'a> {
-    pub dest: PathBuf,
-    pub src: PathBuf,
-    action_spec: ActionSpec,
-    syncer_spec: &'a SyncerSpec,
-    file_type: FileType,
+pub enum Action<'a> {
+    Encode {
+        dest: PathBuf,
+        src: PathBuf,
+        action_spec: ActionSpec,
+        syncer_spec: &'a SyncerSpec,
+        file_type: FileType,
+    },
 }
 
 ///
@@ -47,7 +49,7 @@ impl<'a> Action<'a> {
 
         macro_rules! action {
             ( $cipher_spec:expr, $unix_mode:expr, $key_hash:expr ) => {
-                Ok(Action {
+                Ok(Action::Encode {
                     action_spec: ActionSpec::new(&$cipher_spec.resalt(salt_len), salt_len, $unix_mode, $key_hash)?,
                     dest: dest.to_path_buf(),
                     file_type,
@@ -74,11 +76,12 @@ impl<'a> Action<'a> {
         //
         create_dir_all_if_nexists(&action_arena)?;
 
-        //
-        match &self.syncer_spec {
-            SyncerSpec::Encrypt { .. } => self.encrypt(&action_arena, key_hash),
-            SyncerSpec::Decrypt { .. } => self.decrypt(&action_arena, key_hash),
-            _ => todo!(),
+        match self {
+            Action::Encode { syncer_spec, .. } => match syncer_spec {
+                SyncerSpec::Encrypt { .. } => self.encrypt(&action_arena, key_hash),
+                SyncerSpec::Decrypt { .. } => self.decrypt(&action_arena, key_hash),
+                _ => todo!(),
+            },
         }
     }
 
@@ -86,75 +89,97 @@ impl<'a> Action<'a> {
     fn encrypt(self, action_arena: &Path, key_hash: &DerivedKey) -> CsyncResult<Self> {
         let tmp_dest = action_arena.join("Action_encrypt");
 
-        remove(&tmp_dest)?;
-        {
-            // use a macro to circumvent the type system
-            macro_rules! csync {
-                ( $get_src:expr ) => {
-                    csync_encrypt(
-                        &self.syncer_spec,
-                        &self.action_spec,
-                        action_arena,
-                        $get_src,
-                        &mut fopen_w(&tmp_dest)?,
-                        key_hash,
-                    )?
-                };
-            };
-            match self.file_type {
-                FileType::File => csync!(fopen_r(&self.src)?),
-                FileType::Dir => {
-                    let rand_bytes = rng!(MIN_DIR_RAND_DATA_LEN, MAX_DIR_RAND_DATA_LEN);
-                    csync!(rand_bytes.0.unsecure())
+        match &self {
+            Action::Encode {
+                dest,
+                file_type,
+                src,
+                syncer_spec,
+                action_spec,
+                ..
+            } => {
+                remove(&tmp_dest)?;
+                {
+                    // use a macro to circumvent the type system
+                    macro_rules! csync {
+                        ( $get_src:expr ) => {
+                            csync_encrypt(
+                                &syncer_spec,
+                                &action_spec,
+                                action_arena,
+                                $get_src,
+                                &mut fopen_w(&tmp_dest)?,
+                                key_hash,
+                            )?
+                        };
+                    };
+                    match file_type {
+                        FileType::File => csync!(fopen_r(&src)?),
+                        FileType::Dir => {
+                            let rand_bytes = rng!(MIN_DIR_RAND_DATA_LEN, MAX_DIR_RAND_DATA_LEN);
+                            csync!(rand_bytes.0.unsecure())
+                        }
+                    };
                 }
-            };
+
+                // eqivalent to `mkdir --parents "$(dirname $dest)"`
+                match dest.parent() {
+                    Some(parent) => create_dir_all_if_nexists(parent)?,
+                    None => (),
+                };
+
+                // swap
+                rename(tmp_dest, &dest)?;
+
+                Ok(self)
+            }
         }
-
-        // eqivalent to `mkdir --parents "$(dirname $dest)"`
-        match self.dest.parent() {
-            Some(parent) => create_dir_all_if_nexists(parent)?,
-            None => (),
-        };
-
-        // swap
-        rename(tmp_dest, &self.dest)?;
-
-        Ok(self)
     }
 
     ///
     fn decrypt(self, action_arena: &Path, key_hash: &DerivedKey) -> CsyncResult<Self> {
         let tmp_dest = action_arena.join("Action_decrypt");
 
-        remove(&tmp_dest)?;
-        let (_, action_spec) = csync_decrypt(
-            fopen_r(&self.src)?,
-            match self.file_type {
-                FileType::File => Some(fopen_w(&tmp_dest)?),
-                FileType::Dir => None,
-            },
-            key_hash,
-        )?;
+        match &self {
+            Action::Encode {
+                dest,
+                file_type,
+                src,
+                syncer_spec,
+                action_spec,
+                ..
+            } => {
+                remove(&tmp_dest)?;
+                let (_, action_spec) = csync_decrypt(
+                    fopen_r(&src)?,
+                    match file_type {
+                        FileType::File => Some(fopen_w(&tmp_dest)?),
+                        FileType::Dir => None,
+                    },
+                    key_hash,
+                )?;
 
-        match self.dest.parent() {
-            Some(parent) => create_dir_all_if_nexists(parent)?,
-            None => (),
-        };
-        match self.file_type {
-            FileType::File => (),
-            FileType::Dir => create_dir_all_if_nexists(&tmp_dest)?,
-        };
+                match dest.parent() {
+                    Some(parent) => create_dir_all_if_nexists(parent)?,
+                    None => (),
+                };
+                match file_type {
+                    FileType::File => (),
+                    FileType::Dir => create_dir_all_if_nexists(&tmp_dest)?,
+                };
 
-        // set permission bits of `tmp_dest`
-        {
-            let permission = Permissions::from_mode(action_spec.get_unix_mode().unwrap());
-            File::open(&tmp_dest)?.set_permissions(permission)?;
-        }
+                // set permission bits of `tmp_dest`
+                {
+                    let permission = Permissions::from_mode(action_spec.get_unix_mode().unwrap());
+                    File::open(&tmp_dest)?.set_permissions(permission)?;
+                }
 
-        match rename(&tmp_dest, &self.dest) {
-            Ok(_) => Ok(self),
-            Err(_) if self.file_type == FileType::Dir && self.dest.is_dir() => Ok(self),
-            Err(err) => Err(err)?,
+                match rename(&tmp_dest, &dest) {
+                    Ok(_) => Ok(self),
+                    Err(_) if *file_type == FileType::Dir && dest.is_dir() => Ok(self),
+                    Err(err) => Err(err)?,
+                }
+            }
         }
     }
 }

@@ -34,7 +34,7 @@ mod cli;
 
 use crate::{
     clargs::{Opts, Opts::*},
-    crypt::syncer::*,
+    crypt::{action::*, syncer::*},
     prelude::*,
     secure_vec::*,
     specs::prelude::*,
@@ -244,24 +244,27 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
             // TODO just report error using filtermap instead of stopping the whole thing
             let (result, time_taken) = time!(actions
                 .map(move |action_res| {
-                    let action = action_res?;
-                    // action and how long that action took
-                    match (std::fs::metadata(action.src), std::fs::metadata(action.dest)) {
-                        // sizes oif the src and dest files in bytes
-                        // TODO reduce meta calls by including this in meta map and propagating it
-                        (Ok(meta_src), Ok(meta_dst)) => {
-                            let src_bytes = meta_src.len();
-                            let dst_bytes = meta_dst.len();
-                            if $verbose {
-                                sender
-                                    .lock()
-                                    .unwrap()
-                                    .send(Some((src_bytes as usize, dst_bytes as usize)))
-                                    .unwrap();
+                    match action_res? {
+                        Action::Encode { src, dest, .. } => {
+                            // action and how long that action took
+                            match (std::fs::metadata(src), std::fs::metadata(dest)) {
+                                // sizes oif the src and dest files in bytes
+                                // TODO reduce meta calls by including this in meta map and propagating it
+                                (Ok(meta_src), Ok(meta_dst)) => {
+                                    let src_bytes = meta_src.len();
+                                    let dst_bytes = meta_dst.len();
+                                    if $verbose {
+                                        sender
+                                            .lock()
+                                            .unwrap()
+                                            .send(Some((src_bytes as usize, dst_bytes as usize)))
+                                            .unwrap();
+                                    }
+                                    Ok((src_bytes as f64, dst_bytes as f64))
+                                }
+                                _ => csync_err!(NonFatalReportFailed),
                             }
-                            Ok((src_bytes as f64, dst_bytes as f64))
                         }
-                        _ => csync_err!(NonFatalReportFailed),
                     }
                 })
                 .fold(
