@@ -35,7 +35,6 @@ mod cli;
 use crate::{
     clargs::{Opts, Opts::*},
     crypt::syncer::*,
-    hasher::deterministic_hash,
     prelude::*,
     secure_vec::*,
     specs::prelude::*,

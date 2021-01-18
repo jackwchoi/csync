@@ -183,10 +183,9 @@ pub fn check_out_dir(out_dir: &Path, spec: &SyncerSpec) -> CsyncResult<()> {
         //
         true if out_dir.is_dir() => match spec {
             SyncerSpec::Encrypt { .. } => {
-                // TODO check for missing files
-                if std::fs::read_dir(out_dir)?.count() > 0 {
+                /*if std::fs::read_dir(out_dir)?.count() > 0 {
                     todo!();
-                }
+                }*/
                 Ok(())
             }
             SyncerSpec::Decrypt { .. } => match read_dir(out_dir)?.count() {

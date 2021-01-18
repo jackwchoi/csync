@@ -1,13 +1,12 @@
-use crate::{fs_util::*, prelude::*, test_util::*, tests_e2e::success::util::*, util::*};
+use crate::{prelude::*, test_util::*, tests_e2e::success::util::*, util::*};
 use colmac::*;
 use itertools::{Either, Itertools};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     io::Write,
     path::PathBuf,
     time::{Duration, Instant, SystemTime},
 };
-use tempfile::TempDir;
 use walkdir::{DirEntry, WalkDir};
 
 #[derive(PartialEq, Eq, Hash)]
@@ -97,11 +96,12 @@ where
             true => std::fs::create_dir_all(full_path).unwrap(),
             false => {
                 std::fs::create_dir_all(full_path.parent().unwrap()).unwrap();
-                std::fs::File::create(dbg!(full_path)).unwrap();
+                std::fs::File::create(full_path).unwrap();
             }
         });
 }
 
+#[derive(Debug)]
 struct Snapshot {
     pub time: Instant,
     pub files: HashSet<PathBuf>,
@@ -135,6 +135,14 @@ where
         })
 }
 
+fn subpaths<P1, P2>(paths: &HashSet<P2>, root: P1) -> HashSet<std::path::PathBuf>
+where
+    P1: AsRef<std::path::Path>,
+    P2: AsRef<std::path::Path>,
+{
+    paths.iter().map(|p| subpath(p, &root).unwrap()).collect()
+}
+
 // 1. encrypt source -> out_dir
 // 1. decrypt out_dir -> dec_dir
 // 1. make changes based on change_set, to source
@@ -149,7 +157,6 @@ macro_rules! generate_incremental_build_success_test_func {
         fn $fn_name() {
             let root_tmpdir = $root_tmpdir;
             let files_to_create = $files_to_create;
-            create_files(root_tmpdir.path(), &files_to_create);
 
             //
             let exit_code = 0;
@@ -157,6 +164,7 @@ macro_rules! generate_incremental_build_success_test_func {
             //
             let source = tmpdir!().unwrap();
             let source = source.path();
+            create_files(&source, &files_to_create);
 
             //
             let out_dir = tmpdir!().unwrap();
@@ -170,13 +178,15 @@ macro_rules! generate_incremental_build_success_test_func {
             let key_2 = key_1;
 
             macro_rules! encrypt {
-                () => {
+                ( $source_pbuf_iter:block, $outdir_pbuf_iter:block ) => {
                     check_encrypt!(
                         exit_code,
                         &source,
                         &out_dir,
                         key_1,
                         key_2,
+                        $source_pbuf_iter,
+                        $outdir_pbuf_iter,
                         path_as_str!(source),
                         &format!("-o {}", path_as_str!(&out_dir))
                     )
@@ -197,17 +207,17 @@ macro_rules! generate_incremental_build_success_test_func {
                 };
             }
 
+            let original_source_snapshot = snapshot(&source);
+
             // initial encryption from `source` -> `out_dir`
-            encrypt!();
+            encrypt!({ |_| true }, { |_| true });
+            let source_snapshot_after_init_enc = snapshot(&source);
             let out_dir_snapshot = snapshot(&out_dir);
 
             decrypt!(source, out_dir, dec_dir_1);
             let dec_dir_1_snapshot = snapshot(&dec_dir_1);
 
             let time_after_initial_enc = SystemTime::now();
-
-            // sleep some after the thread, not sure if this is actually effective though
-            std::thread::sleep(Duration::from_secs(2));
 
             // change set with relative paths
             let rel_change_set = $rel_change_set;
@@ -242,8 +252,17 @@ macro_rules! generate_incremental_build_success_test_func {
                 },
             });
 
+            let time_after_change = SystemTime::now();
+
             // incremental encryption from `source` -> `out_dir`
-            encrypt!();
+            encrypt!(
+                {
+                    |path| {
+                        find(&path).any(|p| time_after_initial_enc < std::fs::metadata(p.unwrap()).unwrap().modified().unwrap())
+                    }
+                },
+                { |path| find(&path).any(|p| time_after_change < std::fs::metadata(p.unwrap()).unwrap().modified().unwrap()) }
+            );
 
             // decrypt the incrementally encrypted result to a different directory
             // to check that deleted files are correctly reflected
@@ -256,8 +275,9 @@ macro_rules! generate_incremental_build_success_test_func {
                 decrypt!(source, out_dir, dec_dir_2);
 
                 // check to see if the deletions are reflected
-                let dec_dir_2_snapshot = snapshot(&dec_dir_2);
-                let deleted_files_actual: HashSet<_> = dec_dir_1_snapshot.files.difference(&dec_dir_2_snapshot.files).collect();
+                let dec_dir_1_rel_paths = subpaths(&dec_dir_1_snapshot.files, &dec_dir_1);
+                let dec_dir_2_rel_paths = subpaths(&snapshot(&dec_dir_2).files, &dec_dir_2);
+                let deleted_files_actual: HashSet<_> = dec_dir_1_rel_paths.difference(&dec_dir_2_rel_paths).collect();
                 let deleted_files_expect: HashSet<_> = change_set
                     .iter()
                     .filter_map(|c| match c {
@@ -265,7 +285,7 @@ macro_rules! generate_incremental_build_success_test_func {
                         _ => None,
                     })
                     .collect();
-                assert_eq!(deleted_files_actual, deleted_files_expect);
+                assert_eq!(deleted_files_actual, deleted_files_expect, "deleted files don't match");
             }
             // now `source` and `out_dir` only contain newly created and modified files
 
@@ -346,27 +366,42 @@ macro_rules! generate_incremental_build_success_test_func {
 macro_rules! append {
     ( $path:literal ) => {
         Change::Append(PathBuf::from($path))
-    }
+    };
 }
 macro_rules! create {
     ( $path:literal ) => {
         Change::CreateDir(PathBuf::from($path))
-    }
+    };
 }
 macro_rules! delete {
     ( $path:literal ) => {
         Change::Delete(PathBuf::from($path))
-    }
+    };
 }
 
-generate_incremental_build_success_test_func!(
-    delete_file,
-    tmpdir!().unwrap(),
-    vec!["d1/", "d1/d2/", "d1/d2/f1", "d1/d2/f2", "d1/f3"],
-    hashset![delete!("d1/f3")],
-    "80G3L0ybIYpzgdHbFS3YXGCvCi1e8Tc0stuQ26T8T7mKvttF0wxvoMcYNRiFSpKJ"
-);
+mod deletions {
+    use super::*;
 
+    //
+    generate_incremental_build_success_test_func!(
+        delete_file,
+        tmpdir!().unwrap(),
+        vec!["d1/", "d1/d2/", "d1/d2/f1", "d1/d2/f2", "d1/d3", "d1/f3"],
+        hashset![delete!("d1/f3")],
+        "80G3L0ybIYpzgdHbFS3YXGCvCi1e8Tc0stuQ26T8T7mKvttF0wxvoMcYNRiFSpKJ"
+    );
+
+    //
+    generate_incremental_build_success_test_func!(
+        delete_empty_dir,
+        tmpdir!().unwrap(),
+        vec!["d1/", "d1/d2/", "d1/d2/f1", "d1/d2/f2", "d1/d3", "d1/f3"],
+        hashset![delete!("d1/d3")],
+        "DZsrSWWxIkLMBl8RjijVhlNsQk1tsVv0fN3bi5qvH0wbRxnEKLQHKQfHS9v99mHu"
+    );
+}
+
+/*
 #[test]
 fn created_files_are_detected() {
     todo!();
@@ -375,3 +410,4 @@ fn created_files_are_detected() {
 fn changed_files_are_detected() {
     todo!();
 }
+*/

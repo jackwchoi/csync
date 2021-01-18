@@ -205,10 +205,12 @@ impl Syncer {
                     // if from_dir failed, outdir must either be empty or non-existent
                     match (out_dir.exists(), out_dir.is_dir()) {
                         (false, _) => (),
-                        (true, true) => match std::fs::read_dir(out_dir).map(Iterator::count)? {
+                        (true, true) => (),
+                        /*
+                                           match std::fs::read_dir(out_dir).map(Iterator::count)? {
                             0 => (),
                             _ => csync_err!(IncrementalEncryptionDisabledForNow)?,
-                        },
+                        },*/
                         (true, false) => csync_err!(OutdirIsNotDir, out_dir.to_path_buf())?,
                     }
 

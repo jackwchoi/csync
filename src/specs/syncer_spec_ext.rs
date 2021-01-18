@@ -52,10 +52,13 @@ impl std::convert::TryFrom<&Opts> for SyncerSpecExt {
             Opts::Encrypt { out_dir, .. } => {
                 if out_dir.exists() {
                     match out_dir.is_dir() {
-                        true => match std::fs::read_dir(out_dir).map(Iterator::count)? {
+                        true => (),
+                        /*
+                            match std::fs::read_dir(out_dir).map(Iterator::count)? {
                             0 => (),
                             _ => csync_err!(IncrementalEncryptionDisabledForNow)?,
                         },
+                        */
                         false => csync_err!(OutdirIsNotDir, out_dir.to_path_buf())?,
                     }
                 }

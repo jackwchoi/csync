@@ -259,7 +259,6 @@ fn decryption_outdir_is_nonempty() {
 AuthenticationFail,                    // checksum verification failed for this file
 DecryptionOutdirIsNonempty(PathBuf),   // when decrypting, outdir must be empty
 HashSpecConflict,                      //
-IncrementalEncryptionDisabledForNow => 100,
 MetadataLoadFailed(String),            // couldn't load this metadata file
 NonFatalReportFailed,                  //
 Other(String),                         // anything else
@@ -358,59 +357,4 @@ fn source_does_not_have_filename() {
         path_as_str!(&source),
         &format!("-o {}", path_as_str!(&out_dir.path()))
     );
-}
-
-mod incremental_encryption_disabled_for_now {
-    use super::*;
-
-    //
-    macro_rules! testgen {
-        //
-        ( $fn_name:ident, $outdir_and_tmpd:expr ) => {
-            //
-            #[test]
-            fn $fn_name() {
-                //
-                let exit_code = CsyncErr::IncrementalEncryptionDisabledForNow.exit_code();
-
-                // same keys
-                let key_1 = "s5cZP4BNq0LlcWzlPG8vxho569u7d120";
-                let key_2 = key_1;
-
-                //
-                let source = tmpdir!().unwrap();
-                let (out_dir, _tmpd) = $outdir_and_tmpd;
-
-                // encryption checks
-                check_core!(
-                    exit_code,
-                    key_1,
-                    key_2,
-                    "encrypt",
-                    path_as_str!(&source),
-                    &format!("-o {}", path_as_str!(&out_dir))
-                );
-            }
-        };
-    }
-
-    testgen!(contains_file, {
-        let tmpd = tmpdir!().unwrap();
-
-        let filepath = tmpd.path().join("4Lhfo56kkktP95PYfXFWc5JNmRT8iCVj");
-        {
-            std::fs::File::create(&filepath).unwrap();
-        }
-
-        (tmpd.path().to_path_buf(), tmpd)
-    });
-
-    testgen!(contains_empty_dir, {
-        let tmpd = tmpdir!().unwrap();
-
-        let dirpath = tmpd.path().join("4Lhfo56kkktP95PYfXFWc5JNmRT8iCVj");
-        std::fs::create_dir(&dirpath).unwrap();
-
-        (tmpd.path().to_path_buf(), tmpd)
-    });
 }

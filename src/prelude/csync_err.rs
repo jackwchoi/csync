@@ -19,7 +19,6 @@ pub enum CsyncErr {
     ControlFlow,                           //
     DecryptionOutdirIsNonempty(PathBuf),   // when decrypting, outdir must be empty
     HashSpecConflict,                      //
-    IncrementalEncryptionDisabledForNow,   //
     MetadataLoadFailed(String),            // couldn't load this metadata file
     NonFatalReportFailed,                  //
     Other(String),                         // anything else
@@ -44,7 +43,6 @@ impl CsyncErr {
             ControlFlow => 34,
             DecryptionOutdirIsNonempty(_) => 35,
             HashSpecConflict => 36,
-            IncrementalEncryptionDisabledForNow => 37,
             MetadataLoadFailed(_) => 39,
             NonFatalReportFailed => 40,
             Other(_) => 41,
@@ -76,7 +74,6 @@ impl Display for CsyncErr {
             ControlFlow => w!("Control flow"),
             DecryptionOutdirIsNonempty(pbuf) => w!("Cannot decrypt to `--outdir={:?}` because it is not empty.", pbuf),
             HashSpecConflict => w!("Cannot specify the strength of the hash with params AND time."),
-            IncrementalEncryptionDisabledForNow => w!("Incremental Encryption is disabled for now"),
             MetadataLoadFailed(message) => w!("Could not load metadata file, password is prbs wrong: {}", message),
             NonFatalReportFailed => w!("Failed to report; is not fatal"),
             Other(desc) => w!("{}", desc),
@@ -146,7 +143,6 @@ mod tests {
             ControlFlow,
             DecryptionOutdirIsNonempty(PathBuf::from("")),
             HashSpecConflict,
-            IncrementalEncryptionDisabledForNow,
             MetadataLoadFailed("".to_string()),
             NonFatalReportFailed,
             Other("".to_string()),
@@ -167,7 +163,6 @@ mod tests {
                 ControlFlow => true,
                 DecryptionOutdirIsNonempty(_) => true,
                 HashSpecConflict => true,
-                IncrementalEncryptionDisabledForNow => true,
                 MetadataLoadFailed(_) => true,
                 NonFatalReportFailed => true,
                 Other(_) => true,

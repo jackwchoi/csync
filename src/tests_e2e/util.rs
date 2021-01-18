@@ -157,8 +157,12 @@ macro_rules! check_encrypt {
         $out_dir:expr,
         $key_1:expr,
         $key_2:expr,
+        $source_filter:block,
+        $outdir_filter:block,
         $( $arg:expr ),+
     ) => {{
+        //
+        let source = $source;
         //
         let out_dir = $out_dir;
         // hash of the directory structure, te see if anything changes
@@ -174,9 +178,9 @@ macro_rules! check_encrypt {
                 // check the number of files synced
                 {
                     // count all files and dirs in `$source`; these are the ones that `csync` encrypts
-                    let source_file_count = get_all_source($source).count();
+                    let source_file_count = get_all_source(&source).filter($source_filter).count();
                     // count only the files in `$out_dir`; everything else in there doesn't really care
-                    let cipher_file_count = get_all_outdir(&out_dir).count();
+                    let cipher_file_count = get_all_outdir(&out_dir).filter($outdir_filter).count();
                     // check that the 2 are equal, meaning that the correct number have been synced
                     assert_eq!(source_file_count, cipher_file_count, "check_encrypt! count match fail");
 
@@ -188,7 +192,8 @@ macro_rules! check_encrypt {
                 // check the amount of data read from `$source`
                 {
                     // sum up the number of bytes in each file/dir in `$source`
-                    let data_read: u64 = get_all_source($source)
+                    let data_read: u64 = get_all_source(&source)
+                        .filter($source_filter)
                         .map(|pb| std::fs::metadata(&pb).unwrap().len())
                         .sum();
                     // check that it was reported correctly
@@ -200,6 +205,7 @@ macro_rules! check_encrypt {
                 {
                     // sum up the number of bytes in each file in `$out_dir`
                     let data_written: u64 = get_all_outdir(&out_dir)
+                        .filter($outdir_filter)
                         .map(|pb| std::fs::metadata(&pb).unwrap().len())
                         .sum();
                     // check that it was reported correctly
@@ -215,7 +221,26 @@ macro_rules! check_encrypt {
             },
         };
         output
-    }}
+    }};
+    (
+        $exit_code_expected:expr,
+        $source:expr,
+        $out_dir:expr,
+        $key_1:expr,
+        $key_2:expr,
+        $( $arg:expr ),+
+    ) => {
+        check_encrypt!(
+            $exit_code_expected,
+            $source,
+            $out_dir,
+            $key_1,
+            $key_2,
+            { |_| true },
+            { |_| true },
+            $( $arg ),+
+        );
+    }
 }
 
 /// Functionally a strict superset of `check_core`; does some decryption-specific checks.
