@@ -196,6 +196,23 @@ impl Syncer {
                 match Syncer::from_dir(spec_ext, &init_key) {
                     //
                     Ok(syncer) => {
+                        // TODO delete
+                        let decrypt_spec = syncer.get_spec().inverse().unwrap();
+                        // TODO reuse derived key
+                        let derived_key = syncer.derived_key.clone();
+                        let decryptor = Syncer::with_spec(decrypt_spec, init_key.clone(), Some(derived_key))?;
+                        decryptor.sync_dec_dry()?.for_each(|action_res| match action_res.unwrap() {
+                            Action::Encode {
+                                dest,
+                                src,
+                                action_spec,
+                                syncer_spec,
+                                file_type,
+                            } => {
+                                dbg!(&src, &dest, src.exists(), dest.exists());
+                            }
+                        });
+
                         //
                         if *verbose {
                             eprintln!("Metadata recovered: csync will use this instead of provided options.");
