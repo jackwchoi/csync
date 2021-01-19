@@ -309,6 +309,7 @@ impl Syncer {
             } => {
                 self.check_rep();
 
+                /*
                 // TODO delet
                 let decrypt_spec = inverse_spec(&self.spec).unwrap();
                 // TODO reuse derived key
@@ -323,11 +324,10 @@ impl Syncer {
                         file_type,
                     } => match dest.exists() {
                         true => None,
-                        false => Some(Ok(
-                            
-                                )),
+                        false => Some(Ok(Action::Delete { src, file_type })),
                     },
                 });
+                */
 
                 //
                 let other_actions = meta_map(source).filter_map(move |meta_res| match meta_res {
@@ -382,7 +382,8 @@ impl Syncer {
                     }
                     Err(err) => Some(Err(err)),
                 });
-                Ok(deleting_actions.chain(other_actions))
+                //Ok(deleting_actions.chain(other_actions))
+                Ok(other_actions)
             }
             _ => todo!(),
         }

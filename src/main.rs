@@ -265,6 +265,7 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
                                 _ => csync_err!(NonFatalReportFailed),
                             }
                         }
+                        Action::Delete { .. } => todo!(),
                     }
                 })
                 .fold(

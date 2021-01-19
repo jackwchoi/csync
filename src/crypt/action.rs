@@ -25,6 +25,10 @@ pub enum Action<'a> {
         syncer_spec: &'a SyncerSpec,
         file_type: FileType,
     },
+    Delete {
+        src: PathBuf,
+        file_type: FileType,
+    },
 }
 
 ///
@@ -82,6 +86,7 @@ impl<'a> Action<'a> {
                 SyncerSpec::Decrypt { .. } => self.decrypt(&action_arena, key_hash),
                 _ => todo!(),
             },
+            Action::Delete { .. } => todo!(),
         }
     }
 
@@ -133,6 +138,7 @@ impl<'a> Action<'a> {
 
                 Ok(self)
             }
+            Action::Delete { .. } => todo!(),
         }
     }
 
@@ -180,6 +186,7 @@ impl<'a> Action<'a> {
                     Err(err) => Err(err)?,
                 }
             }
+            Action::Delete { .. } => todo!(),
         }
     }
 }
