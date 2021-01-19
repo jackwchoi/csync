@@ -280,7 +280,7 @@ impl Syncer {
 
     /// 1. for the root cfile,
     ///
-    pub fn sync_enc<'a>(&'a self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>> + 'a> {
+    pub fn sync_enc(&self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>>> {
         eprint!("{}", report_syncer_spec(&self.spec));
         match &self.spec {
             SyncerSpec::Encrypt { out_dir, .. } => {
@@ -297,7 +297,7 @@ impl Syncer {
     }
 
     ///
-    pub fn sync_enc_dry<'a>(&'a self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>> + 'a> {
+    pub fn sync_enc_dry(&self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>>> {
         match &self.spec {
             SyncerSpec::Encrypt {
                 source,
@@ -390,7 +390,7 @@ impl Syncer {
     }
 
     ///
-    pub fn sync_dec<'a>(&'a self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>> + 'a> {
+    pub fn sync_dec(&self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>>> {
         eprint!("{}", report_syncer_spec(&self.spec));
         match &self.spec {
             SyncerSpec::Decrypt { out_dir, .. } => {
@@ -409,7 +409,7 @@ impl Syncer {
     }
 
     ///
-    pub fn sync_dec_dry<'a>(&'a self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>> + 'a> {
+    pub fn sync_dec_dry(&self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>>> {
         match &self.spec {
             SyncerSpec::Decrypt {
                 source,
