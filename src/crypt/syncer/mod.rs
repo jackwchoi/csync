@@ -408,6 +408,7 @@ impl Syncer {
         }
     }
 
+    // TODO think about the performance implications of rfc and etc
     ///
     pub fn sync_dec_dry(&self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>>> {
         match &self.spec {

@@ -197,7 +197,18 @@ where
     }
 
     fn diag(&mut self) {
-        if 0 < self.chars.len() && 5 <= self.term_height {
+        let term_height_ok = 5 <= self.term_height;
+        if term_height_ok {
+            Self::cached_write_color(
+                &mut self.screen,
+                &mut self.cache_length,
+                Reset,
+                self.pw_len_goto,
+                LENGTH_HEADER,
+                self.chars.len(),
+            );
+        }
+        if 0 < self.chars.len() && term_height_ok {
             //clean!(pw_len_goto, cache_length);
             Self::cached_write_color(
                 &mut self.screen,
