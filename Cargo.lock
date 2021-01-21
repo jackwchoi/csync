@@ -219,7 +219,6 @@ dependencies = [
  "itertools 0.8.2",
  "memchr",
  "openssl",
- "rand",
  "rand_chacha",
  "rayon",
  "regex",

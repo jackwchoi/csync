@@ -1,6 +1,8 @@
 use crate::secure_vec::*;
-use rand::{CryptoRng, RngCore, SeedableRng};
-use rand_chacha::ChaCha20Rng;
+use rand_chacha::{
+    rand_core::{CryptoRng, RngCore, SeedableRng},
+    ChaCha20Rng,
+};
 use std::convert::TryInto;
 
 // # Returns
