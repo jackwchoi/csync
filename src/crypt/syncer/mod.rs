@@ -71,6 +71,11 @@ pub struct Syncer {
     spec: SyncerSpec,
 }
 
+#[derive(Debug)]
+pub struct SyncerResults<T> {
+    owned_data: Option<T>
+}
+
 ///
 impl Syncer {
     /// # Returns
@@ -309,7 +314,8 @@ impl Syncer {
             } => {
                 self.check_rep();
 
-                /*
+               
+                
                 // TODO delet
                 let decrypt_spec = inverse_spec(&self.spec).unwrap();
                 // TODO reuse derived key
@@ -327,7 +333,12 @@ impl Syncer {
                         false => Some(Ok(Action::Delete { src, file_type })),
                     },
                 });
-                */
+                // ideas:
+                // 1. use arc
+                // 1. instead of returning an iterator, return a struct with an ownership of
+                //    decryptor, and have this impl ParallelIterator
+                            
+    
 
                 //
                 let other_actions = meta_map(source).filter_map(move |meta_res| match meta_res {
@@ -382,8 +393,8 @@ impl Syncer {
                     }
                     Err(err) => Some(Err(err)),
                 });
-                //Ok(deleting_actions.chain(other_actions))
-                Ok(other_actions)
+                Ok(deleting_actions.chain(other_actions))
+                //Ok(other_actions)
             }
             _ => todo!(),
         }
