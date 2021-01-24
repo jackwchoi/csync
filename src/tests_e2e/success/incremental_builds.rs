@@ -16,6 +16,8 @@ enum Change {
     Delete(PathBuf),
 }
 
+// TODO https://doc.rust-lang.org/std/macro.is_x86_feature_detected.html
+
 // REQUIREMENTS: incremental build
 //
 // 1. detect deleted files
@@ -99,26 +101,6 @@ where
                 std::fs::File::create(full_path).unwrap();
             }
         });
-}
-
-#[derive(Debug)]
-struct Snapshot {
-    pub time: Instant,
-    pub files: HashSet<PathBuf>,
-}
-
-fn snapshot<P>(root: P) -> Snapshot
-where
-    P: AsRef<std::path::Path>,
-{
-    Snapshot {
-        time: Instant::now(),
-        files: WalkDir::new(root)
-            .into_iter()
-            .map(Result::unwrap)
-            .map(DirEntry::into_path)
-            .collect(),
-    }
 }
 
 fn csync_files<P>(root: P) -> impl Iterator<Item = walkdir::DirEntry>
@@ -225,9 +207,9 @@ macro_rules! generate_incremental_build_success_test_func {
             let change_set: HashSet<_> = rel_change_set
                 .iter()
                 .map(|c| match c {
-                    Change::Append(path) => Change::Append(root_tmpdir.path().join(path)),
-                    Change::CreateDir(path) => Change::CreateDir(root_tmpdir.path().join(path)),
-                    Change::Delete(path) => Change::Delete(root_tmpdir.path().join(path)),
+                    Change::Append(path) => Change::Append(source.join(path)),
+                    Change::CreateDir(path) => Change::CreateDir(source.join(path)),
+                    Change::Delete(path) => Change::Delete(source.join(path)),
                 })
                 .collect();
             // actually perform the changes
@@ -254,15 +236,37 @@ macro_rules! generate_incremental_build_success_test_func {
 
             let time_after_change = SystemTime::now();
 
+            dbg!(snapshot(&out_dir).files.len());
             // incremental encryption from `source` -> `out_dir`
             encrypt!(
                 {
                     |path| {
-                        find(&path).any(|p| time_after_initial_enc < std::fs::metadata(p.unwrap()).unwrap().modified().unwrap())
+                        find(&path)
+                            .filter(|x| {
+                                dbg!(
+                                    x,
+                                    time_after_initial_enc < std::fs::metadata(x.clone().unwrap()).unwrap().modified().unwrap()
+                                );
+                                true
+                            })
+                            .any(|p| time_after_initial_enc < std::fs::metadata(p.unwrap()).unwrap().modified().unwrap())
                     }
                 },
-                { |path| find(&path).any(|p| time_after_change < std::fs::metadata(p.unwrap()).unwrap().modified().unwrap()) }
+                {
+                    |path| {
+                        find(&path)
+                            .filter(|x| {
+                                dbg!(
+                                    x,
+                                    time_after_change < std::fs::metadata(x.clone().unwrap()).unwrap().modified().unwrap()
+                                );
+                                true
+                            })
+                            .any(|p| time_after_change < std::fs::metadata(p.unwrap()).unwrap().modified().unwrap())
+                    }
+                }
             );
+            dbg!(snapshot(&out_dir).files.len());
 
             // decrypt the incrementally encrypted result to a different directory
             // to check that deleted files are correctly reflected
@@ -277,6 +281,7 @@ macro_rules! generate_incremental_build_success_test_func {
                 // check to see if the deletions are reflected
                 let dec_dir_1_rel_paths = subpaths(&dec_dir_1_snapshot.files, &dec_dir_1);
                 let dec_dir_2_rel_paths = subpaths(&snapshot(&dec_dir_2).files, &dec_dir_2);
+                dbg!(&dec_dir_1_rel_paths, &dec_dir_2_rel_paths);
                 let deleted_files_actual: HashSet<_> = dec_dir_1_rel_paths.difference(&dec_dir_2_rel_paths).collect();
                 let deleted_files_expect: HashSet<_> = change_set
                     .iter()
@@ -379,6 +384,8 @@ macro_rules! delete {
     };
 }
 
+// TODO use hash based modification detection
+
 mod deletions {
     use super::*;
 
@@ -386,18 +393,9 @@ mod deletions {
     generate_incremental_build_success_test_func!(
         delete_file,
         tmpdir!().unwrap(),
-        vec!["d1/", "d1/d2/", "d1/d2/f1", "d1/d2/f2", "d1/d3", "d1/f3"],
-        hashset![delete!("d1/f3")],
+        vec!["d1/", "d1/d2/", "d1/d2/f1", "d1/d2/f2", "d1/d3", "d1/f3", "f4"],
+        hashset![delete!("f4")],
         "80G3L0ybIYpzgdHbFS3YXGCvCi1e8Tc0stuQ26T8T7mKvttF0wxvoMcYNRiFSpKJ"
-    );
-
-    //
-    generate_incremental_build_success_test_func!(
-        delete_empty_dir,
-        tmpdir!().unwrap(),
-        vec!["d1/", "d1/d2/", "d1/d2/f1", "d1/d2/f2", "d1/d3", "d1/f3"],
-        hashset![delete!("d1/d3")],
-        "DZsrSWWxIkLMBl8RjijVhlNsQk1tsVv0fN3bi5qvH0wbRxnEKLQHKQfHS9v99mHu"
     );
 }
 

@@ -52,6 +52,9 @@ use termion::color;
 
 ////////////////////////////////  ////////////////////////////////
 
+#[cfg(not(unix))]
+compile_error!("only unix systems are supported");
+
 // TODO
 // 1. dry run flag to show which files would be run on
 // 2. incremental build
@@ -253,29 +256,32 @@ fn run(opts: &Opts) -> CsyncResult<RunResult> {
                                 (Ok(meta_src), Ok(meta_dst)) => {
                                     let src_bytes = meta_src.len();
                                     let dst_bytes = meta_dst.len();
-                                    if $verbose {
-                                        sender
-                                            .lock()
-                                            .unwrap()
-                                            .send(Some((src_bytes as usize, dst_bytes as usize)))
-                                            .unwrap();
-                                    }
-                                    Ok((src_bytes as f64, dst_bytes as f64))
+                                    Ok((src_bytes as f64, dst_bytes as f64, false))
                                 }
                                 _ => csync_err!(NonFatalReportFailed),
                             }
                         }
-                        Action::Delete { .. } => todo!(),
+                        // TODO delete dest not src, which is always file
+                        // TODO keep the src/dest pair just for reporting purposes
+                        Action::Delete { file_size, .. } => Ok((0f64, -1.0 * file_size as f64, true)),
                     }
                 })
                 .fold(
                     || CsyncResult::Ok((0usize, 0f64, 0f64)),
                     |acc_res, res| {
                         let (count, src_size_acc, dst_size_acc) = acc_res?;
-                        let (src_size, dst_size) = res?;
+                        let (src_size, dst_size, is_deleted_file) = res?;
+                        sender
+                            .lock()
+                            .unwrap()
+                            .send(Some((src_size as usize, dst_size as usize)))
+                            .unwrap();
 
                         Ok((
-                            count + 1,               // counting one more
+                            match is_deleted_file {
+                                true => count,
+                                false => count + 1,
+                            }, // counting one more
                             src_size_acc + src_size, // sum up the size of src files in bytes
                             dst_size_acc + dst_size, // sum up the size of src files in bytes
                         ))

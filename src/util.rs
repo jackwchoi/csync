@@ -8,12 +8,12 @@ use std::{
 ///
 pub fn adjust_value(value: f64, base_unit: &str) -> (String, String) {
     let (adjusted, unit) = match value {
-        v if value < 1e03 => (v, format!(" {}", base_unit)),
-        v if value < 1e06 => (v / 1e03, format!("K{}", base_unit)),
-        v if value < 1e09 => (v / 1e06, format!("M{}", base_unit)),
-        v if value < 1e12 => (v / 1e09, format!("G{}", base_unit)),
-        v if value < 1e15 => (v / 1e12, format!("T{}", base_unit)),
-        v if value < 1e18 => (v / 1e15, format!("P{}", base_unit)),
+        v if value.abs() < 1e03 => (v, format!(" {}", base_unit)),
+        v if value.abs() < 1e06 => (v / 1e03, format!("K{}", base_unit)),
+        v if value.abs() < 1e09 => (v / 1e06, format!("M{}", base_unit)),
+        v if value.abs() < 1e12 => (v / 1e09, format!("G{}", base_unit)),
+        v if value.abs() < 1e15 => (v / 1e12, format!("T{}", base_unit)),
+        v if value.abs() < 1e18 => (v / 1e15, format!("P{}", base_unit)),
         v => (v, format!("many {}", base_unit)),
     };
     let adjusted_value = format!("{:.3}", adjusted);

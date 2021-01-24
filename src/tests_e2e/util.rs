@@ -1,12 +1,55 @@
 use crate::{prelude::*, test_util::*, util::*};
-use std::path::Path;
-use std::{io, path::PathBuf};
+use std::{
+    collections::HashSet,
+    io,
+    path::{Path, PathBuf},
+    time::Instant,
+};
+use walkdir::{DirEntry, WalkDir};
 
 // `&Path -> &str`
 macro_rules! path_as_str {
     ( $path:expr ) => {
         &path_as_string($path).unwrap()
     };
+}
+
+#[derive(Debug)]
+pub struct Snapshot {
+    pub time: Instant,
+    pub files: HashSet<PathBuf>,
+    pub size: usize,
+}
+
+pub struct SnapshotDiff {
+    pub added: HashSet<PathBuf>,
+}
+
+impl Snapshot {
+    pub fn since(&self, other: &Snapshot) -> SnapshotDiff {
+        todo!()
+    }
+}
+
+pub fn snapshot<P>(root: P) -> Snapshot
+where
+    P: AsRef<std::path::Path>,
+{
+  //  hash_tree
+
+    Snapshot {
+        time: Instant::now(),
+        files: WalkDir::new(&root)
+            .into_iter()
+            .map(Result::unwrap)
+            .map(DirEntry::into_path)
+            .collect(),
+        size: WalkDir::new(&root)
+            .into_iter()
+            .map(Result::unwrap)
+            .map(|d| d.metadata().unwrap().len())
+            .sum::<u64>() as usize,
+    }
 }
 
 // # Returns
@@ -54,15 +97,20 @@ pub fn grep_report_line_with_header(header: &str, output: &std::process::Output)
     };
 
     //
-    assert_eq!(match_lines.len(), 1);
+    assert_eq!(match_lines.len(), 1, "should only be one match");
     match_lines.get(0).unwrap().to_string()
 }
 
 //
 pub fn check_report_line(line: &str, value: f64, unit: &str) {
     let (adjusted_value, adj_unit) = adjust_value(value, unit);
-    assert!(line.ends_with(&adj_unit));
-    assert!(line.contains(&adjusted_value));
+    assert!(line.ends_with(&adj_unit), "line does not end with {} {}", adj_unit, line);
+    assert!(
+        line.contains(&adjusted_value),
+        "line does not contain {} {}",
+        adjusted_value,
+        line
+    );
 }
 
 // # Returns
@@ -161,6 +209,7 @@ macro_rules! check_encrypt {
         $outdir_filter:block,
         $( $arg:expr ),+
     ) => {{
+        // TODO pass deleted file num
         //
         let source = $source;
         //
@@ -182,6 +231,11 @@ macro_rules! check_encrypt {
                     // count only the files in `$out_dir`; everything else in there doesn't really care
                     let cipher_file_count = get_all_outdir(&out_dir).filter($outdir_filter).count();
                     // check that the 2 are equal, meaning that the correct number have been synced
+                    if source_file_count != cipher_file_count {
+                        // dir modified times change when content files change
+                        dbg!(get_all_source(&source).filter($source_filter).collect::<Vec<_>>());
+                        dbg!(get_all_outdir(&out_dir).filter($outdir_filter).collect::<Vec<_>>());
+                    }
                     assert_eq!(source_file_count, cipher_file_count, "check_encrypt! count match fail");
 
                     // check that `csync` reports the correct number, for number of files synced
@@ -192,13 +246,13 @@ macro_rules! check_encrypt {
                 // check the amount of data read from `$source`
                 {
                     // sum up the number of bytes in each file/dir in `$source`
-                    let data_read: u64 = get_all_source(&source)
+                    let data_read = get_all_source(&source)
                         .filter($source_filter)
                         .map(|pb| std::fs::metadata(&pb).unwrap().len())
-                        .sum();
+                        .sum::<u64>() as f64;
                     // check that it was reported correctly
                     let data_read_line = grep_report_line_with_header(REPORT_HEADER_DATA_READ, &output);
-                    check_report_line(&data_read_line, data_read as f64, "B");
+                    check_report_line(&data_read_line, data_read, "B");
                 }
 
                 // check the amount of data written to `$out_dir`

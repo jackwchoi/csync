@@ -69,11 +69,13 @@ pub struct Syncer {
     init_key: InitialKey,
     //
     spec: SyncerSpec,
+    //
+    inverse_syncer_opt: Option<Box<Syncer>>,
 }
 
 #[derive(Debug)]
 pub struct SyncerResults<T> {
-    owned_data: Option<T>
+    owned_data: Option<T>,
 }
 
 ///
@@ -271,11 +273,22 @@ impl Syncer {
                             None => time!(*verbose, "Generating a derived key", key_deriv_spec.derive(&init_key.0 .0)?).0,
                         };
 
+                        // inverse_spec only for encrypt
+                        let inverse_syncer_opt = match &spec {
+                            SyncerSpec::Encrypt { .. } => Some({
+                                let decrypt_spec = inverse_spec(&spec).unwrap();
+                                let derived_key = derived_key.clone();
+                                Box::new(Syncer::with_spec(decrypt_spec, init_key.clone(), Some(derived_key))?)
+                            }),
+                            _ => None,
+                        };
+
                         Ok(Self {
                             arena: tmpdir!()?,
                             init_key,
                             derived_key,
                             spec,
+                            inverse_syncer_opt,
                         })
                     }
                 }
@@ -314,11 +327,8 @@ impl Syncer {
             } => {
                 self.check_rep();
 
-               
-                
-                // TODO delet
+                /*
                 let decrypt_spec = inverse_spec(&self.spec).unwrap();
-                // TODO reuse derived key
                 let derived_key = self.derived_key.clone();
                 let decryptor = Syncer::with_spec(decrypt_spec, self.init_key.clone(), Some(derived_key))?;
                 let deleting_actions = decryptor.sync_dec_dry()?.filter_map(|action_res| match action_res.unwrap() {
@@ -337,8 +347,7 @@ impl Syncer {
                 // 1. use arc
                 // 1. instead of returning an iterator, return a struct with an ownership of
                 //    decryptor, and have this impl ParallelIterator
-                            
-    
+                */
 
                 //
                 let other_actions = meta_map(source).filter_map(move |meta_res| match meta_res {
@@ -393,8 +402,26 @@ impl Syncer {
                     }
                     Err(err) => Some(Err(err)),
                 });
-                Ok(deleting_actions.chain(other_actions))
-                //Ok(other_actions)
+
+                Ok(self
+                    .inverse_syncer_opt
+                    .as_ref()
+                    .unwrap()
+                    .sync_dec_dry()?
+                    .filter_map(|action_res| match action_res.unwrap() {
+                        Action::Encode {
+                            dest, src, file_type, ..
+                        } => match dest.exists() {
+                            true => None,
+                            false => Some(Ok(Action::Delete {
+                                path: src.clone(),
+                                file_type,
+                                file_size: std::fs::metadata(&src).map(|m| m.len()).unwrap_or(0) as usize,
+                            })),
+                        },
+                        Action::Delete { .. } => None,
+                    })
+                    .chain(other_actions))
             }
             _ => todo!(),
         }
@@ -413,7 +440,6 @@ impl Syncer {
                     .map(move |action| action?.manifest(self.arena.path(), &self.derived_key)))
             }
             _ => {
-                dbg!(&self.spec);
                 todo!()
             }
         }
