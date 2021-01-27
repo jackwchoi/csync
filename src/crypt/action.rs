@@ -70,6 +70,24 @@ impl<'a> Action<'a> {
         }
     }
 
+    fn out_of_date(&self) -> Option<bool> {
+        // TODO do hash based checks
+        // TODO bake this into csync_*crypt somehow?
+        match self {
+            Action::Encode {
+                src, dest, syncer_spec, ..
+            } => match syncer_spec {
+                SyncerSpec::Encrypt { .. } => {
+                    todo!();
+                    todo!()
+                }
+                SyncerSpec::Decrypt { .. } => None,
+                SyncerSpec::Clean { .. } => None,
+            },
+            Action::Delete { .. } => None,
+        }
+    }
+
     /// # Parameters
     ///
     /// 1. `arena`: some directory such that  `Action`

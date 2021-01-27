@@ -215,6 +215,7 @@ where
             let auth_spec_ser = ser(authenticator_spec)?;
             let auth_sig_ser = ser(&auth_sig.0)?;
 
+            // TODO include authenticated signature of the plaintext in the front
             //
             compose_encoders!(
                 auth_spec_ser.unsecure()
