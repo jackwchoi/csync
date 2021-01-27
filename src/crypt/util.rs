@@ -13,6 +13,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::Path,
+    sync::mpsc::channel,
 };
 
 // consts about random padding used in the encryption
@@ -181,7 +182,7 @@ where
                         $compressor => $compressor_opts,
                         $encryptor => $encryptor_opts
                     )?),
-                HmacEncoder => (&key_hash.0, Some($hmac_alg))
+                HmacEncoder => (&key_hash.0, Some((Some($hmac_alg), None)))
             )?;
             // read the content to `tmpf_path` to avoid memory
             auth_encoder.read_all_to(&mut fopen_w(&tmpf_path)?)?;
@@ -259,6 +260,7 @@ where
     let auth_spec: AuthenticatorSpec = deser(&mut src)?;
     let auth_sig = CryptoSecureBytes(deser::<_, SecureBytes>(&mut src)?);
 
+    let (sender, receiver) = channel();
     // create an authenticated encoder that reads from the rest of `src`
     //
     // the reason this gets created here is to read the data verbatim while computing the signature
@@ -266,7 +268,7 @@ where
     let mut auth_encoder = match auth_spec {
         AuthenticatorSpec::HmacSha512 => compose_encoders!(
             src,
-            HmacEncoder => (&key_hash.0, Some(hmac::HMAC_SHA512))
+            HmacEncoder => (&key_hash.0, Some((Some(hmac::HMAC_SHA512), Some(sender))))
         )?,
     };
 
@@ -292,11 +294,14 @@ where
                 None => plaintext.read_all_to(&mut std::io::sink())?,
             };
 
+            /*
             let computed_auth_sig = plaintext
                 .get_inner().unwrap()
                 .get_inner_ref().unwrap()
                 .get_inner_ref().unwrap()
                 .get_result().unwrap();
+            */
+            let computed_auth_sig = receiver.recv().unwrap();
             match auth_sig == computed_auth_sig {
                 true => Ok(()),
                 false => csync_err!(AuthenticationFail),

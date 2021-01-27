@@ -245,3 +245,7 @@ cargo install csync
 1. move all TODO's in code to here
 1. use std::fs::Permissions::readonly instead of unix permbits
 1. don't show diag when decrypting
+
+
+1. hash based change detection
+1. have authenticated encoder return result through mpsc
