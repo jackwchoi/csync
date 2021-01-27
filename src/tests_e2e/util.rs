@@ -1,6 +1,7 @@
+pub use std::collections::{HashMap, HashSet};
+
 use crate::{prelude::*, secure_vec::*, test_util::*, util::*};
 use std::{
-    collections::{HashMap, HashSet},
     io,
     path::{Path, PathBuf},
     time::Instant,
@@ -73,6 +74,7 @@ impl Snapshot {
             Some(other_v) if self_v != other_v => Some(k.clone()),
             _ => None,
         });
+        dbg!(&self, &other, &added, &modified);
         let size_change = added.iter().map(|p| *self.file_size.get(p).unwrap()).sum::<usize>() as isize
             + modified.iter().map(|p| *self.file_size.get(p).unwrap()).sum::<usize>() as isize
             - deleted.iter().map(|p| *other.file_size.get(p).unwrap()).sum::<usize>() as isize;
@@ -250,7 +252,7 @@ macro_rules! check_core {
             assert_eq!(exit_code, $exit_code_expected, "{:?}", output);
         }
         //
-        dbg!(output)
+        output
     }}
 }
 
@@ -270,7 +272,6 @@ macro_rules! check_encrypt {
         $key_1:expr,
         $key_2:expr,
         $source_filter:block,
-        $outdir_filter:block,
         $( $arg:expr ),+
     ) => {{
         // TODO pass deleted file num
@@ -300,8 +301,20 @@ macro_rules! check_encrypt {
                     // count all files and dirs in `$source`; these are the ones that `csync` encrypts
                     let source_file_count = get_all_source(&source).filter($source_filter).count();
                     // count only the files in `$out_dir`; everything else in there doesn't really care
-                    let cipher_file_count = get_all_outdir(&out_dir).filter($outdir_filter).count();
-                    assert_eq!(source_file_count, cipher_file_count, "check_encrypt! count match fail");
+                    //
+                    let out_dir_diff = out_dir_snapshot_after.since(&out_dir_snapshot_before);
+                    let out_dir_diff_modified_created: HashSet<_> =  out_dir_diff
+                        .added
+                        .union(& out_dir_diff.modified)
+                        .cloned()
+                        .collect();
+                    let cipher_file_count = get_all_outdir(&out_dir).filter(|p| out_dir_diff_modified_created.contains(p)).count();
+
+                   assert_eq!(
+                        source_file_count,
+                        cipher_file_count,
+                        "wrong number of files synced"
+                    );
 
                     // check that `csync` reports the correct number, for number of files synced
                     let file_count_line = grep_report_line_with_header(REPORT_HEADER_NUM_FILES, &output);
@@ -327,14 +340,6 @@ macro_rules! check_encrypt {
                         |p| p.extension() == Some("csync".as_ref())
                     );
                     let data_written = out_dir_diff.size_change as f64;
-                    /*
-                    // sum up the number of bytes in each file in `$out_dir`
-                    let data_written: u64 = get_all_outdir(&out_dir)
-                        .filter($outdir_filter)
-                        .map(|pb| std::fs::metadata(&pb).unwrap().len())
-                        .sum();
-                    // check that it was reported correctly
-                    */
                     let data_written_line = grep_report_line_with_header(REPORT_HEADER_DATA_WRITTEN, &output);
                     check_report_line(&data_written_line, data_written as f64, "B");
                 }
@@ -361,7 +366,6 @@ macro_rules! check_encrypt {
             $out_dir,
             $key_1,
             $key_2,
-            { |_| true },
             { |_| true },
             $( $arg ),+
         );
