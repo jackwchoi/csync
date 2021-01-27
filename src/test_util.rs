@@ -166,11 +166,11 @@ where
 
 ///
 #[inline]
-pub fn basename<P>(path: &P) -> Option<String>
+pub fn basename<P>(path: P) -> Option<PathBuf>
 where
     P: AsRef<Path>,
 {
-    path.as_ref().file_name()?.to_str().map(String::from)
+    path.as_ref().file_name()?.to_str().map(Path::new).map(Path::to_path_buf)
 }
 
 /// Check that two files are equivalent.

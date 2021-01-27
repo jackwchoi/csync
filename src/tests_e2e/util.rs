@@ -1,6 +1,6 @@
-use crate::{prelude::*, test_util::*, util::*};
+use crate::{prelude::*, secure_vec::*, test_util::*, util::*};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     io,
     path::{Path, PathBuf},
     time::Instant,
@@ -16,18 +16,77 @@ macro_rules! path_as_str {
 
 #[derive(Debug)]
 pub struct Snapshot {
-    pub time: Instant,
-    pub files: HashSet<PathBuf>,
-    pub size: usize,
+    root: PathBuf,
+    time: Instant,
+    file_map: HashMap<PathBuf, CryptoSecureBytes>,
+    file_size: HashMap<PathBuf, usize>,
 }
 
+#[derive(Debug)]
 pub struct SnapshotDiff {
     pub added: HashSet<PathBuf>,
+    pub modified: HashSet<PathBuf>,
+    pub deleted: HashSet<PathBuf>,
+    pub size_change: isize,
 }
 
 impl Snapshot {
+    //
+    #[inline]
+    pub fn files(&self) -> HashSet<PathBuf> {
+        self.file_map.keys().cloned().collect()
+    }
+
+    #[inline]
+    pub fn file_map(&self) -> HashMap<PathBuf, CryptoSecureBytes> {
+        self.file_map.clone()
+    }
+
+    // self is the more recent one
+    #[inline]
     pub fn since(&self, other: &Snapshot) -> SnapshotDiff {
-        todo!()
+        self.since_with_filter(other, |_| true)
+    }
+    //
+    pub fn since_with_filter<F>(&self, other: &Snapshot, filter: F) -> SnapshotDiff
+    where
+        F: Fn(&Path) -> bool,
+    {
+        macro_rules! since {
+            ( $ss1:ident, $closure:expr ) => {
+                $ss1.file_map
+                    .iter()
+                    .filter(|(k, _)| filter(k))
+                    .filter_map($closure)
+                    .collect::<HashSet<_>>()
+            };
+        }
+        let added = since!(self, |(k, _)| match other.file_map.contains_key(k.as_path()) {
+            true => None,
+            false => Some(k.clone()),
+        });
+        let deleted = since!(other, |(k, _)| match self.file_map.contains_key(k.as_path()) {
+            true => None,
+            false => Some(k.clone()),
+        });
+        let modified = since!(self, |(k, self_v)| match other.file_map.get(k.as_path()) {
+            Some(other_v) if self_v != other_v => Some(k.clone()),
+            _ => None,
+        });
+        let size_change = added.iter().map(|p| *self.file_size.get(p).unwrap()).sum::<usize>() as isize
+            + modified.iter().map(|p| *self.file_size.get(p).unwrap()).sum::<usize>() as isize
+            - deleted.iter().map(|p| *other.file_size.get(p).unwrap()).sum::<usize>() as isize;
+        SnapshotDiff {
+            added,
+            deleted,
+            modified,
+            size_change,
+        }
+    }
+
+    #[inline]
+    pub fn tree_hash(&self) -> CryptoSecureBytes {
+        self.file_map.get(&self.root).unwrap().clone()
     }
 }
 
@@ -35,21 +94,26 @@ pub fn snapshot<P>(root: P) -> Snapshot
 where
     P: AsRef<std::path::Path>,
 {
-  //  hash_tree
-
+    //  hash_tree
     Snapshot {
+        root: root.as_ref().to_path_buf(),
         time: Instant::now(),
-        files: WalkDir::new(&root)
-            .into_iter()
-            .map(Result::unwrap)
-            .map(DirEntry::into_path)
-            .collect(),
-        size: WalkDir::new(&root)
-            .into_iter()
-            .map(Result::unwrap)
-            .map(|d| d.metadata().unwrap().len())
-            .sum::<u64>() as usize,
+        file_map: file_map(&root, |d| hash_tree(d.path()).unwrap().unwrap()),
+        file_size: file_map(&root, |d| d.metadata().unwrap().len() as usize),
     }
+}
+
+//
+fn file_map<P, F, V>(root: P, value_producer: F) -> HashMap<PathBuf, V>
+where
+    P: AsRef<std::path::Path>,
+    F: Fn(&DirEntry) -> V,
+{
+    WalkDir::new(&root)
+        .into_iter()
+        .map(Result::unwrap)
+        .map(|d| (d.path().to_path_buf(), value_producer(&d)))
+        .collect()
 }
 
 // # Returns
@@ -164,7 +228,7 @@ macro_rules! check_core {
         let output = {
             // concat args  to spawn a child process
             let mut proc = {
-                let command: String = vec!["cargo run --", $subcommand, $( $arg ),+]
+                let command: String = vec!["RUSTBACKTRACE=1 cargo run --", $subcommand, $( $arg ),+]
                     .into_iter()
                     .intersperse(" ")
                     .collect();
@@ -186,7 +250,7 @@ macro_rules! check_core {
             assert_eq!(exit_code, $exit_code_expected, "{:?}", output);
         }
         //
-        output
+        dbg!(output)
     }}
 }
 
@@ -212,13 +276,20 @@ macro_rules! check_encrypt {
         // TODO pass deleted file num
         //
         let source = $source;
+
         //
         let out_dir = $out_dir;
         // hash of the directory structure, te see if anything changes
-        let out_dir_hash_before = hash_tree(&out_dir);
+        //let out_dir_hash_before = hash_tree(&out_dir);
 
         //
+        let source_snapshot_before = snapshot(&source);
+        let out_dir_snapshot_before = snapshot(&out_dir);
+        //
         let output = check_core!($exit_code_expected, $key_1, $key_2, "encrypt", $( $arg ),+);
+        //
+        let source_snapshot_after = snapshot(&source);
+        let out_dir_snapshot_after = snapshot(&out_dir);
 
         // exit code of the process
         match output.status.code().unwrap() {
@@ -230,12 +301,6 @@ macro_rules! check_encrypt {
                     let source_file_count = get_all_source(&source).filter($source_filter).count();
                     // count only the files in `$out_dir`; everything else in there doesn't really care
                     let cipher_file_count = get_all_outdir(&out_dir).filter($outdir_filter).count();
-                    // check that the 2 are equal, meaning that the correct number have been synced
-                    if source_file_count != cipher_file_count {
-                        // dir modified times change when content files change
-                        dbg!(get_all_source(&source).filter($source_filter).collect::<Vec<_>>());
-                        dbg!(get_all_outdir(&out_dir).filter($outdir_filter).collect::<Vec<_>>());
-                    }
                     assert_eq!(source_file_count, cipher_file_count, "check_encrypt! count match fail");
 
                     // check that `csync` reports the correct number, for number of files synced
@@ -257,21 +322,27 @@ macro_rules! check_encrypt {
 
                 // check the amount of data written to `$out_dir`
                 {
+                    let out_dir_diff = out_dir_snapshot_after.since_with_filter(
+                        &out_dir_snapshot_before,
+                        |p| p.extension() == Some("csync".as_ref())
+                    );
+                    let data_written = out_dir_diff.size_change as f64;
+                    /*
                     // sum up the number of bytes in each file in `$out_dir`
                     let data_written: u64 = get_all_outdir(&out_dir)
                         .filter($outdir_filter)
                         .map(|pb| std::fs::metadata(&pb).unwrap().len())
                         .sum();
                     // check that it was reported correctly
+                    */
                     let data_written_line = grep_report_line_with_header(REPORT_HEADER_DATA_WRITTEN, &output);
                     check_report_line(&data_written_line, data_written as f64, "B");
                 }
             }
             // TODO do things like chekcing to make sure that the files didn't change and etc
             _ => {
-                // hash of the directory structure, te see if anything changes
-                let out_dir_hash_after = hash_tree(&out_dir);
-                assert_eq!(out_dir_hash_before, out_dir_hash_after);
+                // hash of the directory structure, te see if anything changed
+                assert_eq!(out_dir_snapshot_before.tree_hash(), out_dir_snapshot_after.tree_hash());
             },
         };
         output
