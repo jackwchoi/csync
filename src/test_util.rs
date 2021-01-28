@@ -39,7 +39,7 @@ where
             let fail = walkdir::WalkDir::new(&path)
                 .sort_by(|a, b| a.file_name().cmp(b.file_name()))
                 .into_iter()
-                .map(|entry_res| -> CsyncResult<bool> {
+                .map(|entry_res| -> CsyncResult<()> {
                     let entry = entry_res?;
                     let file = fopen_r(entry.path())?;
 
@@ -49,23 +49,10 @@ where
                         None => csync_err!(PathContainsInvalidUtf8Bytes, entry.path().to_path_buf()),
                     }?;
 
-                    // feed filename
-                    ctx.update(entry_path_as_str.as_bytes());
-                    // feed file permision bits
-                    let perm_bits_as_u32 = perm_bits(&entry.path())?;
-                    let perm_bits_as_u8s = u32_to_u8s(perm_bits_as_u32);
-                    ctx.update(&perm_bits_as_u8s);
+                    let file_hash = hash_file(entry.path(), &key_hash)?;
+                    ctx.update(file_hash.0.unsecure());
 
-                    let mut buf_reader = std::io::BufReader::new(file);
-                    let mut buffer = [0u8; DEFAULT_BUFFER_SIZE];
-
-                    loop {
-                        match buf_reader.read(&mut buffer) {
-                            Ok(0) => break Ok(true),
-                            Ok(bytes_read) => ctx.update(&buffer[..bytes_read]),
-                            Err(_) => break Ok(false),
-                        }
-                    }
+                    Ok(())
                 })
                 .any(|res| res.is_err());
 
@@ -75,6 +62,44 @@ where
             }
         }
         false => Ok(None),
+    }
+}
+
+pub fn hash_file<P>(path: P, key_hash: &CryptoSecureBytes) -> CsyncResult<CryptoSecureBytes>
+where
+    P: AsRef<Path>,
+{
+    let mut ctx = {
+        let hmac_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA512, key_hash.0.unsecure());
+        ring::hmac::Context::with_key(&hmac_key)
+    };
+    let file = fopen_r(&path)?;
+
+    // feed file permision bits
+    let perm_bits_as_u32 = perm_bits(&path)?;
+    let perm_bits_as_u8s = u32_to_u8s(perm_bits_as_u32);
+    ctx.update(&perm_bits_as_u8s);
+
+    // branch on file/dir
+
+    macro_rules! finish {
+        () => {
+            Ok(CryptoSecureBytes(ctx.clone().sign().as_ref().to_vec().into()))
+        };
+    }
+    match path.as_ref().is_file() {
+        true => {
+            let mut buf_reader = std::io::BufReader::new(file);
+            let mut buffer = [0u8; DEFAULT_BUFFER_SIZE];
+
+            loop {
+                match buf_reader.read(&mut buffer)? {
+                    0 => break finish!(),
+                    bytes_read => ctx.update(&buffer[..bytes_read]),
+                }
+            }
+        }
+        false => finish!(),
     }
 }
 
