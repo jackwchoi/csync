@@ -381,8 +381,8 @@ impl Syncer {
                                     &self.derived_key,
                                 );
 
-                                match dbg!(action_res) {
-                                    Ok(action) => match dbg!(action.out_of_date()) {
+                                match action_res {
+                                    Ok(action) => match action.out_of_date() {
                                         Ok(Some(true)) | Ok(None) => Some(Ok(action)),
                                         Ok(Some(false)) => None,
                                         Err(err) => Some(Err(err)),

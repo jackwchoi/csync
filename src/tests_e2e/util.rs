@@ -68,7 +68,6 @@ impl Snapshot {
             Some(other_v) if self_v != other_v => Some(k.clone()),
             _ => None,
         });
-        dbg!(&self, &other, &added, &modified);
         let size_change = added.iter().map(|p| *self.file_size.get(p).unwrap()).sum::<usize>() as isize
             + modified.iter().map(|p| *self.file_size.get(p).unwrap()).sum::<usize>() as isize
             - deleted.iter().map(|p| *other.file_size.get(p).unwrap()).sum::<usize>() as isize;
@@ -302,10 +301,6 @@ macro_rules! check_encrypt {
                         .collect();
                     let cipher_file_count = get_all_outdir(&out_dir).filter(|p| out_dir_diff_modified_created.contains(p)).count();
 
-                    dbg!(&source);
-                    dbg!(get_all_source(&source).filter($source_filter).collect::<HashSet<_>>());
-                    dbg!(&out_dir);
-                    dbg!(&out_dir_diff_modified_created);
                     assert_eq!(
                         source_file_count,
                         cipher_file_count,
