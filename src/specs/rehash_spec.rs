@@ -11,12 +11,10 @@ impl RehashSpec {
         Self(kd_spec)
     }
 
-    #[inline]
     pub fn rehash(&self, key_hash: &DerivedKey) -> CsyncResult<RehashedKey> {
         self.0.derive(&key_hash.0 .0).map(|derived_key| RehashedKey(derived_key.0))
     }
 
-    #[inline]
     pub fn verify(&self, rehash: &RehashedKey, key_hash: &DerivedKey) -> CsyncResult<()> {
         // NOTE this is a constant time operation, given that `SecureVec`'s `Eq` is const
         match &self.rehash(key_hash)? == rehash {

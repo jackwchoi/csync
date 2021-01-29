@@ -64,7 +64,6 @@ pub fn adjust_value(value: f64, base_unit: &str) -> (String, String) {
 }
 
 ///
-#[inline]
 pub fn serialize<'a, T>(strct: &'a T) -> CsyncResult<impl serde::Deserialize<'a> + Into<SecureBytes> + AsRef<[u8]>>
 where
     T: std::fmt::Debug + serde::Serialize,
@@ -76,7 +75,6 @@ where
 }
 
 ///
-#[inline]
 pub fn deserialize<'a, T>(bytes: &'a [u8]) -> CsyncResult<T>
 where
     T: std::fmt::Debug + serde::Deserialize<'a>,
@@ -178,7 +176,6 @@ where
 }
 
 /// Conversion from `&Path` to `String` in one shot.
-#[inline]
 pub fn path_as_string<P>(path: P) -> Option<String>
 where
     P: AsRef<Path>,
@@ -187,13 +184,11 @@ where
 }
 
 ///
-#[inline]
 pub fn start_timer() -> Instant {
     Instant::now()
 }
 
 ///
-#[inline]
 pub fn end_timer(time: &Instant) -> Duration {
     time.elapsed()
 }
@@ -219,7 +214,6 @@ macro_rules! time {
 }
 
 ///
-#[inline]
 pub fn u8s_to_u32(bytes: &[u8]) -> u32 {
     debug_assert_eq!(bytes.len(), 4);
     bytes
@@ -235,7 +229,6 @@ pub fn u8s_to_u32(bytes: &[u8]) -> u32 {
 }
 
 ///
-#[inline]
 pub fn u32_to_u8s(reg: u32) -> Vec<u8> {
     [0xFFu32, 0xFF00u32, 0xFF0000u32, 0xFF000000u32]
         .iter()

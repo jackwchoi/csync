@@ -113,7 +113,6 @@ impl<E> From<E> for CsyncErr
 where
     E: std::error::Error,
 {
-    #[inline]
     fn from(err: E) -> Self {
         CsyncErr::Other(format!("{}", err))
     }
@@ -122,7 +121,6 @@ where
 /// `CsyncErr -> std::io::Erorr`
 impl From<CsyncErr> for io::Error {
     ///
-    #[inline]
     fn from(err: CsyncErr) -> io::Error {
         io::Error::new(io::ErrorKind::Other, format!("{}", err))
     }

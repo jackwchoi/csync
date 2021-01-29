@@ -175,7 +175,6 @@ impl fmt::Display for SyncStats {
 //
 impl SyncStats {
     //
-    #[inline]
     fn new(num_files: usize, src_bytes: f64, dest_bytes: f64, total_thru: f64, total_dur: Duration) -> Self {
         Self {
             dest_bytes,

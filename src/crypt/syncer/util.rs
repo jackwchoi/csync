@@ -230,7 +230,6 @@ pub fn path_to_spread(spread_depth: u8, init_salt: &CryptoSecureBytes, path: &Pa
 /// # Parameters
 ///
 /// 1.
-#[inline]
 pub fn spread_to_hash(spread: &Path) -> CsyncResult<CryptoSecureBytes> {
     // get a hash of the chars in the spread dir path, to use as the initialization
     // vector for the Aes256CbcEnc

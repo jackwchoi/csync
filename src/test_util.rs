@@ -77,7 +77,6 @@ pub fn drng_range(num_bytes: usize, min: u8, max: u8) -> Vec<u8> {
 }
 
 ///
-#[inline]
 pub fn ascii_files() -> impl Iterator<Item = PathBuf> {
     find("src")
         .map(Result::unwrap)
@@ -86,7 +85,6 @@ pub fn ascii_files() -> impl Iterator<Item = PathBuf> {
 }
 
 ///
-#[inline]
 pub fn bin_files() -> impl Iterator<Item = PathBuf> {
     find(".git")
         .map(Result::unwrap)
@@ -95,7 +93,6 @@ pub fn bin_files() -> impl Iterator<Item = PathBuf> {
 }
 
 ///
-#[inline]
 fn parent_unwrap_safely<P>(path: &P) -> &Path
 where
     P: AsRef<Path>,
@@ -145,7 +142,6 @@ where
 }
 
 ///
-#[inline]
 pub fn basename<P>(path: P) -> Option<PathBuf>
 where
     P: AsRef<Path>,
@@ -254,7 +250,6 @@ mod tests {
     use super::*;
 
     ///
-    #[inline]
     fn rel_paths(path: &Path, root: &Path) -> HashSet<PathBuf> {
         find(path).map(Result::unwrap).map(|p| subpath(&p, root).unwrap()).collect()
     }

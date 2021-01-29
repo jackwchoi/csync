@@ -17,7 +17,6 @@ where
     R: Read,
 {
     ///
-    #[inline]
     pub fn new(src: R, _unused: Option<usize>) -> CsyncResult<Self> {
         Ok(Self {
             src: BufReader::new(src),
@@ -31,7 +30,6 @@ where
     R: Read,
 {
     ///
-    #[inline]
     fn read(&mut self, mut target: &mut [u8]) -> io::Result<usize> {
         self.src.read(&mut target)
     }

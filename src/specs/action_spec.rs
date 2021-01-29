@@ -41,12 +41,10 @@ impl ActionSpec {
         })
     }
 
-    #[inline]
     pub fn get_unix_mode(&self) -> Option<u32> {
         self.unix_mode.clone()
     }
 
-    #[inline]
     pub fn verify_derived_key(&self, key_hash: &DerivedKey) -> CsyncResult<()> {
         self.rehash_spec.verify(&self.rehash, key_hash)
     }

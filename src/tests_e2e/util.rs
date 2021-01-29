@@ -79,7 +79,6 @@ impl Snapshot {
         }
     }
 
-    #[inline]
     pub fn tree_hash(&self) -> CryptoSecureBytes {
         self.file_map.get(&self.root).unwrap().clone()
     }
@@ -115,7 +114,6 @@ where
 // # Returns
 //
 // `bytes` forcefully converted to `&str`, assuming it's utf8-encoded.
-#[inline]
 pub fn bytes_to_str(bytes: &[u8]) -> &str {
     std::str::from_utf8(bytes).unwrap()
 }

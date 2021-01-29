@@ -54,7 +54,6 @@ macro_rules! tmpdir {
 }
 
 ///
-#[inline]
 #[allow(dead_code)]
 pub fn mktemp_file(out_dir: Option<&Path>, prefix: &str, suffix: &str) -> std::io::Result<NamedTempFile> {
     tempfile::Builder::new()
@@ -64,7 +63,6 @@ pub fn mktemp_file(out_dir: Option<&Path>, prefix: &str, suffix: &str) -> std::i
 }
 
 ///
-#[inline]
 pub fn mktemp_dir(out_dir: Option<&Path>, prefix: &str, suffix: &str) -> std::io::Result<TempDir> {
     tempfile::Builder::new()
         .prefix(prefix)
@@ -73,7 +71,6 @@ pub fn mktemp_dir(out_dir: Option<&Path>, prefix: &str, suffix: &str) -> std::io
 }
 
 ///
-#[inline]
 pub fn perm_bits<P>(path: &P) -> std::io::Result<u32>
 where
     P: AsRef<Path>,
@@ -82,7 +79,6 @@ where
 }
 
 ///
-#[inline]
 pub fn is_canonical<P>(path: P) -> std::io::Result<bool>
 where
     P: AsRef<Path>,
@@ -95,7 +91,6 @@ where
 /// 1. if the file already exists, the existing content will be truncated
 /// 2. if the file does not exist, the created file will have its Unix permission bits ste to
 ///    `0o600 = 0b0110000000`
-#[inline]
 pub fn fopen_w<P>(path: P) -> std::io::Result<File>
 where
     P: AsRef<Path>,
@@ -109,7 +104,6 @@ where
 }
 
 /// Open a file with a read permission.
-#[inline]
 pub fn fopen_r<P>(path: P) -> std::io::Result<File>
 where
     P: AsRef<Path>,

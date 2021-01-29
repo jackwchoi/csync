@@ -60,7 +60,6 @@ impl From<pbkdf2::Algorithm> for Pbkdf2Algorithm {
     }
 }
 impl Default for Pbkdf2Algorithm {
-    #[inline]
     fn default() -> Self {
         Self::HmacSha512
     }

@@ -46,7 +46,6 @@ where
     }
 
     ///
-    #[inline]
     pub fn get_result(&self) -> Option<CryptoSecureBytes> {
         self.buffer_opt.clone()
     }

@@ -19,7 +19,6 @@ fn size_block(encoding: &Encoding) -> usize {
 }
 
 ///
-#[inline]
 pub fn base32path<R>(readable: R) -> CsyncResult<String>
 where
     R: Read,
