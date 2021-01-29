@@ -372,8 +372,8 @@ impl Syncer {
 
                         // sugar
                         macro_rules! action {
-                            ( $dest:expr ) => {
-                                Some(Action::new(
+                            ( $dest:expr ) => {{
+                                let action_res = Action::new(
                                     &self.spec,
                                     *salt_len,
                                     &src_pbuf.to_path_buf(),
@@ -381,8 +381,17 @@ impl Syncer {
                                     file_type,
                                     Some(perms.mode()),
                                     &self.derived_key,
-                                ))
-                            };
+                                );
+
+                                match dbg!(action_res) {
+                                    Ok(action) => match dbg!(action.out_of_date(&self.derived_key)) {
+                                        Ok(Some(true)) | Ok(None) => Some(Ok(action)),
+                                        Ok(Some(false)) => None,
+                                        Err(err) => Some(Err(err)),
+                                    },
+                                    Err(err) => Some(Err(err)),
+                                }
+                            }};
                         };
 
                         match std::fs::metadata(&cipherpath) {

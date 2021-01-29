@@ -5,6 +5,7 @@ use crate::{
     primitives::*,
     secure_vec::*,
     specs::{action_spec::*, syncer_spec::*},
+    util::hash_file,
 };
 use std::{
     fmt::Debug,
@@ -70,22 +71,27 @@ impl<'a> Action<'a> {
         }
     }
 
-    fn out_of_date(&self) -> Option<bool> {
+    pub fn out_of_date(&self, key_hash: &DerivedKey) -> CsyncResult<Option<bool>> {
         // TODO do hash based checks
         // TODO bake this into csync_*crypt somehow?
-        match self {
+        Ok(match self {
             Action::Encode {
                 src, dest, syncer_spec, ..
             } => match syncer_spec {
-                SyncerSpec::Encrypt { .. } => {
-                    todo!();
-                    todo!()
-                }
+                SyncerSpec::Encrypt { .. } => match dest.exists() {
+                    true => {
+                        // TODO cache this so we only compute hash of src once
+                        let dest_hash = load_meta(&dest)?;
+                        let src_hash = hash_file(&src, &key_hash.0)?.0;
+                        Some(dest_hash != src_hash)
+                    }
+                    false => Some(true),
+                },
                 SyncerSpec::Decrypt { .. } => None,
                 SyncerSpec::Clean { .. } => None,
             },
             Action::Delete { .. } => None,
-        }
+        })
     }
 
     /// # Parameters
@@ -98,16 +104,6 @@ impl<'a> Action<'a> {
 
         //
         create_dir_all_if_nexists(&action_arena)?;
-
-        macro_rules! rm {
-            ( $code:expr ) => {
-                match $code {
-                    Ok(_) => Ok(self),
-                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(self),
-                    Err(err) => Err(err)?,
-                }
-            };
-        }
 
         match &self {
             Action::Encode { syncer_spec, .. } => match syncer_spec {
@@ -138,6 +134,7 @@ impl<'a> Action<'a> {
             } => {
                 remove(&tmp_dest)?;
                 {
+                    let file_hash = hash_file(&src, &key_hash.0)?;
                     // use a macro to circumvent the type system
                     macro_rules! csync {
                         ( $get_src:expr ) => {
@@ -148,6 +145,7 @@ impl<'a> Action<'a> {
                                 $get_src,
                                 &mut fopen_w(&tmp_dest)?,
                                 key_hash,
+                                &file_hash.0,
                             )?
                         };
                     };

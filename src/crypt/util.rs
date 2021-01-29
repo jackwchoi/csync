@@ -149,6 +149,7 @@ pub fn csync_encrypt<P, R, W>(
     source: R,
     mut dest: &mut W,
     key_hash: &DerivedKey,
+    metadata: &SecureBytes,
 ) -> CsyncResult<()>
 where
     P: AsRef<Path>,
@@ -158,6 +159,8 @@ where
     let tmpf_path = arena.as_ref().join("csync_encrypt");
     let rand_padding = random_padding(MIN_RANDPAD_LEN, MAX_RANDPAD_LEN);
 
+    //
+    let metadata_ser = ser(metadata)?;
     //
     let syncer_spec_ser = ser(syncer_spec)?;
     let action_spec_ser = ser(action_spec)?;
@@ -219,7 +222,8 @@ where
             // TODO include authenticated signature of the plaintext in the front
             //
             compose_encoders!(
-                auth_spec_ser.unsecure()
+                metadata_ser.unsecure().chain(
+                auth_spec_ser.unsecure())
                     .chain(auth_sig_ser.unsecure())
                     .chain(fopen_r(&tmpf_path)?),
                 IdentityEncoder => None
@@ -250,12 +254,13 @@ fn csync_decrypt_core<'a, 'b, R, W>(
     mut src: R,
     dest_opt: Option<W>,
     key_hash: &'a DerivedKey,
-) -> CsyncResult<(impl FnOnce() -> CsyncResult<()> + 'b, SyncerSpec, ActionSpec)>
+) -> CsyncResult<(impl FnOnce() -> CsyncResult<()> + 'b, SyncerSpec, ActionSpec, SecureBytes)>
 where
     'a: 'b,
     R: Read + 'a,
     W: Write + 'a,
 {
+    let metadata: SecureBytes = deser(&mut src)?;
     // read the authentication spec and the precomputed signature
     let auth_spec: AuthenticatorSpec = deser(&mut src)?;
     let auth_sig = CryptoSecureBytes(deser::<_, SecureBytes>(&mut src)?);
@@ -335,6 +340,7 @@ where
         },
         syncer_spec,
         action_spec,
+        metadata,
     ))
 }
 
@@ -344,7 +350,7 @@ where
     R: Read,
     W: Write,
 {
-    let (lambda, syncer_spec, action_spec) = csync_decrypt_core(src, dest_opt, key_hash)?;
+    let (lambda, syncer_spec, action_spec, _) = csync_decrypt_core(src, dest_opt, key_hash)?;
     lambda()?;
     Ok((syncer_spec, action_spec))
 }
@@ -355,6 +361,16 @@ where
     P: std::convert::AsRef<Path>,
 {
     let garbage_key = DerivedKey(sha512!(&vec![].into()));
-    let (_, syncer_spec, action_spec) = csync_decrypt_core(fopen_r(path)?, Option::<File>::None, &garbage_key)?;
+    let (_, syncer_spec, action_spec, _) = csync_decrypt_core(fopen_r(path)?, Option::<File>::None, &garbage_key)?;
     Ok((syncer_spec, action_spec))
+}
+
+/// # Parame
+pub fn load_meta<P>(path: P) -> CsyncResult<SecureBytes>
+where
+    P: std::convert::AsRef<Path>,
+{
+    let garbage_key = DerivedKey(sha512!(&vec![].into()));
+    let (_, _, _, metadata) = csync_decrypt_core(fopen_r(path)?, Option::<File>::None, &garbage_key)?;
+    Ok(metadata)
 }

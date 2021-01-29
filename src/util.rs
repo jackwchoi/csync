@@ -1,9 +1,52 @@
-use crate::{prelude::*, secure_vec::*};
+use crate::{
+    fs_util::{fopen_r, perm_bits},
+    prelude::*,
+    secure_vec::*,
+};
 use std::{
     convert::Into,
+    io::Read,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
+
+pub fn hash_file<P>(path: P, key_hash: &CryptoSecureBytes) -> CsyncResult<CryptoSecureBytes>
+where
+    P: AsRef<Path>,
+{
+    let mut ctx = {
+        let hmac_key = ring::hmac::Key::new(ring::hmac::HMAC_SHA512, key_hash.0.unsecure());
+        ring::hmac::Context::with_key(&hmac_key)
+    };
+    let file = fopen_r(&path)?;
+
+    // feed file permision bits
+    let perm_bits_as_u32 = perm_bits(&path)?;
+    let perm_bits_as_u8s = u32_to_u8s(perm_bits_as_u32);
+    ctx.update(&perm_bits_as_u8s);
+
+    // branch on file/dir
+
+    macro_rules! finish {
+        () => {
+            Ok(CryptoSecureBytes(ctx.clone().sign().as_ref().to_vec().into()))
+        };
+    }
+    match path.as_ref().is_file() {
+        true => {
+            let mut buf_reader = std::io::BufReader::new(file);
+            let mut buffer = [0u8; DEFAULT_BUFFER_SIZE];
+
+            loop {
+                match buf_reader.read(&mut buffer)? {
+                    0 => break finish!(),
+                    bytes_read => ctx.update(&buffer[..bytes_read]),
+                }
+            }
+        }
+        false => finish!(),
+    }
+}
 
 ///
 pub fn adjust_value(value: f64, base_unit: &str) -> (String, String) {

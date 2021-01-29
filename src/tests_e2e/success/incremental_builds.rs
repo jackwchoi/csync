@@ -18,74 +18,6 @@ enum Change {
 
 // TODO https://doc.rust-lang.org/std/macro.is_x86_feature_detected.html
 
-// REQUIREMENTS: incremental build
-//
-// 1. detect deleted files
-// 1. detect created files
-// 1. detect changed files based on mod time
-//     1. changed in content
-//     1. changed in permission bits TODO later
-
-// 1. take as an arg HashMap<PathBuf, Change>, specifying the changes to take place after initial
-//    encryption but before incremental encryption
-// 1. after initial encryption, decrypt to a dir
-
-// check that change_set correctly takes dec_dir_1 to dec_dir_2
-fn assert_change_set<P1, P2>(
-    change_set: HashSet<Change>,
-    dec_dir_1: P1,
-    dec_dir_1_snapshot: (Instant, HashSet<PathBuf>),
-    dec_dir_2: P2,
-    dec_dir_2_snapshot: (Instant, HashSet<PathBuf>),
-) where
-    P1: AsRef<Path>,
-    P2: AsRef<Path>,
-{
-    /*
-    //
-    let dir_1_files: HashSet<_> = dec_dir_1_snapshot.1.iter().map(|pbuf| subpath(&pbuf, &dec_dir_1).unwrap()).collect();
-    let dir_2_files: HashSet<_> = dec_dir_2_snapshot.1.iter().map(|pbuf| subpath(&pbuf, &dec_dir_2).unwrap()).collect();
-
-    //
-    let deleted_files: HashSet<_> = dir_1_files.difference(&dir_2_files).cloned().collect();
-    let created_files: HashSet<_> = dir_2_files.difference(&dir_1_files).cloned().collect();
-
-    //
-    let changed_files: HashSet<_> = dir_1_files
-        .intersection(&dir_2_files)
-        .filter(|relpath| {
-            let content_before = std::fs::read_to_string(dec_dir_1.as_ref().join(relpath)).unwrap();
-            let content_after = std::fs::read_to_string(dec_dir_1.as_ref().join(relpath)).unwrap();
-            content_before != content_after
-        })
-        .cloned()
-        .collect();
-
-    //
-    let change_set_deleted_files: HashSet<_> = change_set
-        .iter()
-        .filter_map(|c| match c {
-            Change::Append(path) | Change::CreateDir(path) => None,
-            Change::Delete(path) => Some(path.clone()),
-        })
-        .collect();
-    let change_set_written_files: HashSet<_> = change_set
-        .iter()
-        .filter_map(|c| match c {
-            Change::Append(path) | Change::CreateDir(path) => Some(path.clone()),
-            Change::Delete(path) => None,
-        })
-        .collect();
-
-    //
-    assert_eq!(deleted_files, change_set_deleted_files);
-    assert_eq!(
-        created_files.union(&changed_files).cloned().collect::<HashSet<_>>(),
-        change_set_deleted_files
-    );
-    */
-}
-
 //
 fn create_files<P>(root: P, rel_paths: &Vec<&str>)
 where
@@ -292,7 +224,6 @@ macro_rules! generate_incremental_build_success_test_func {
                     .cloned()
                     .collect();
 
-                dbg!(&dec_dir_1_rel_paths, &dec_dir_2_rel_paths);
                 assert_eq!(
                     &deleted_files_actual, &deleted_files_expect,
                     "deleted files don't match"

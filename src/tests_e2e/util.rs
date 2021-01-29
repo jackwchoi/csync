@@ -1,6 +1,6 @@
 pub use std::collections::{HashMap, HashSet};
 
-use crate::{prelude::*, secure_vec::*, test_util::*, util::*};
+use crate::{prelude::*, secure_vec::*, test_util::*, util::*, hasher::deterministic_hash};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -96,11 +96,12 @@ pub fn snapshot<P>(root: P) -> Snapshot
 where
     P: AsRef<std::path::Path>,
 {
+    let key = deterministic_hash(b"5kHtj95iGi1L9PxoFonv9yv1PKK0QdgGt4B9y9BIj03UGZm7ImZ5vJlt8YUEWYh8".to_vec());
     //  hash_tree
     Snapshot {
         root: root.as_ref().to_path_buf(),
         time: Instant::now(),
-        file_map: file_map(&root, |d| hash_tree(d.path()).unwrap().unwrap()),
+        file_map: file_map(&root, |d| hash_file(d.path(), &key).unwrap()),
         file_size: file_map(&root, |d| d.metadata().unwrap().len() as usize),
     }
 }
@@ -305,12 +306,16 @@ macro_rules! check_encrypt {
                     let out_dir_diff = out_dir_snapshot_after.since(&out_dir_snapshot_before);
                     let out_dir_diff_modified_created: HashSet<_> =  out_dir_diff
                         .added
-                        .union(& out_dir_diff.modified)
+                        .union(&out_dir_diff.modified)
                         .cloned()
                         .collect();
                     let cipher_file_count = get_all_outdir(&out_dir).filter(|p| out_dir_diff_modified_created.contains(p)).count();
 
-                   assert_eq!(
+                    dbg!(&source);
+                    dbg!(get_all_source(&source).filter($source_filter).collect::<HashSet<_>>());
+                    dbg!(&out_dir);
+                    dbg!(&out_dir_diff_modified_created);
+                    assert_eq!(
                         source_file_count,
                         cipher_file_count,
                         "wrong number of files synced"
