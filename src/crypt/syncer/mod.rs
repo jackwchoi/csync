@@ -239,14 +239,12 @@ impl Syncer {
             //
             SyncerSpec::Encrypt {
                 source,
-                out_dir,
                 key_deriv_spec,
                 verbose,
                 ..
             }
             | SyncerSpec::Decrypt {
                 source,
-                out_dir,
                 key_deriv_spec,
                 verbose,
                 ..
@@ -384,7 +382,7 @@ impl Syncer {
                                 );
 
                                 match dbg!(action_res) {
-                                    Ok(action) => match dbg!(action.out_of_date(&self.derived_key)) {
+                                    Ok(action) => match dbg!(action.out_of_date()) {
                                         Ok(Some(true)) | Ok(None) => Some(Ok(action)),
                                         Ok(Some(false)) => None,
                                         Err(err) => Some(Err(err)),

@@ -1,6 +1,6 @@
 pub use std::collections::{HashMap, HashSet};
 
-use crate::{prelude::*, secure_vec::*, test_util::*, util::*, hasher::deterministic_hash};
+use crate::{hasher::deterministic_hash, prelude::*, secure_vec::*, test_util::*, util::*};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -33,21 +33,15 @@ pub struct SnapshotDiff {
 
 impl Snapshot {
     //
-    #[inline]
     pub fn files(&self) -> HashSet<PathBuf> {
         self.file_map.keys().cloned().collect()
     }
 
-    #[inline]
-    pub fn file_map(&self) -> HashMap<PathBuf, CryptoSecureBytes> {
-        self.file_map.clone()
-    }
-
     // self is the more recent one
-    #[inline]
     pub fn since(&self, other: &Snapshot) -> SnapshotDiff {
         self.since_with_filter(other, |_| true)
     }
+
     //
     pub fn since_with_filter<F>(&self, other: &Snapshot, filter: F) -> SnapshotDiff
     where
@@ -92,22 +86,8 @@ impl Snapshot {
     }
 }
 
-pub fn snapshot<P>(root: P) -> Snapshot
-where
-    P: AsRef<std::path::Path>,
-{
-    let key = deterministic_hash(b"5kHtj95iGi1L9PxoFonv9yv1PKK0QdgGt4B9y9BIj03UGZm7ImZ5vJlt8YUEWYh8".to_vec());
-    //  hash_tree
-    Snapshot {
-        root: root.as_ref().to_path_buf(),
-        time: Instant::now(),
-        file_map: file_map(&root, |d| hash_file(d.path(), &key).unwrap()),
-        file_size: file_map(&root, |d| d.metadata().unwrap().len() as usize),
-    }
-}
-
 //
-fn file_map<P, F, V>(root: P, value_producer: F) -> HashMap<PathBuf, V>
+fn file_mapper<P, F, V>(root: P, value_producer: F) -> HashMap<PathBuf, V>
 where
     P: AsRef<std::path::Path>,
     F: Fn(&DirEntry) -> V,
@@ -117,6 +97,20 @@ where
         .map(Result::unwrap)
         .map(|d| (d.path().to_path_buf(), value_producer(&d)))
         .collect()
+}
+
+pub fn snapshot<P>(root: P) -> Snapshot
+where
+    P: AsRef<std::path::Path>,
+{
+    let key = deterministic_hash(b"5kHtj95iGi1L9PxoFonv9yv1PKK0QdgGt4B9y9BIj03UGZm7ImZ5vJlt8YUEWYh8".to_vec());
+    //  hash_tree
+    Snapshot {
+        root: root.as_ref().to_path_buf(),
+        time: Instant::now(),
+        file_map: file_mapper(&root, |d| hash_file(d.path(), &key).unwrap()),
+        file_size: file_mapper(&root, |d| d.metadata().unwrap().len() as usize),
+    }
 }
 
 // # Returns
@@ -141,7 +135,6 @@ pub fn matches(pattern: &str, text: &str) -> Vec<String> {
 // Equivalent to running the following in Bash: `bash -c "$command"`.
 //
 // `&0`, `&1` and `&2` can all be piped.
-#[inline]
 pub fn bash(command: &str) -> io::Result<std::process::Child> {
     std::process::Command::new("bash")
         .arg("-c")
@@ -285,12 +278,10 @@ macro_rules! check_encrypt {
         //let out_dir_hash_before = hash_tree(&out_dir);
 
         //
-        let source_snapshot_before = snapshot(&source);
         let out_dir_snapshot_before = snapshot(&out_dir);
         //
         let output = check_core!($exit_code_expected, $key_1, $key_2, "encrypt", $( $arg ),+);
         //
-        let source_snapshot_after = snapshot(&source);
         let out_dir_snapshot_after = snapshot(&out_dir);
 
         // exit code of the process

@@ -54,19 +54,4 @@ where
 }
 
 ///
-impl<R> CryptEncoder<R> for IdentityEncoder<R>
-where
-    R: Read,
-{
-    ///
-    #[inline]
-    fn get_inner(self) -> Option<R> {
-        Some(self.src.into_inner())
-    }
-
-    ///
-    #[inline]
-    fn get_inner_ref(&self) -> Option<&R> {
-        None
-    }
-}
+impl<R> CryptEncoder<R> for IdentityEncoder<R> where R: Read {}

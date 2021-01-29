@@ -40,12 +40,6 @@ where
         })
     }
 
-    ///
-    fn get_inner(self) -> Option<R>;
-
-    ///
-    fn get_inner_ref(&self) -> Option<&R>;
-
     /// return the content as a vector
     fn as_vec(&mut self) -> CsyncResult<Vec<u8>> {
         let mut result = Vec::new();

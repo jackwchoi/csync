@@ -25,6 +25,7 @@ pub enum Action<'a> {
         action_spec: ActionSpec,
         syncer_spec: &'a SyncerSpec,
         file_type: FileType,
+        src_hash: CryptoSecureBytes,
     },
     Delete {
         path: PathBuf,
@@ -61,6 +62,7 @@ impl<'a> Action<'a> {
                     file_type,
                     src: src.to_path_buf(),
                     syncer_spec,
+                    src_hash: hash_file(&src, &key_hash.0)?,
                 })
             };
         };
@@ -71,19 +73,21 @@ impl<'a> Action<'a> {
         }
     }
 
-    pub fn out_of_date(&self, key_hash: &DerivedKey) -> CsyncResult<Option<bool>> {
+    pub fn out_of_date(&self) -> CsyncResult<Option<bool>> {
         // TODO do hash based checks
         // TODO bake this into csync_*crypt somehow?
         Ok(match self {
             Action::Encode {
-                src, dest, syncer_spec, ..
+                dest,
+                syncer_spec,
+                src_hash,
+                ..
             } => match syncer_spec {
                 SyncerSpec::Encrypt { .. } => match dest.exists() {
                     true => {
                         // TODO cache this so we only compute hash of src once
                         let dest_hash = load_meta(&dest)?;
-                        let src_hash = hash_file(&src, &key_hash.0)?.0;
-                        Some(dest_hash != src_hash)
+                        Some(dest_hash != src_hash.0)
                     }
                     false => Some(true),
                 },
@@ -130,11 +134,11 @@ impl<'a> Action<'a> {
                 src,
                 syncer_spec,
                 action_spec,
+                src_hash,
                 ..
             } => {
                 remove(&tmp_dest)?;
                 {
-                    let file_hash = hash_file(&src, &key_hash.0)?;
                     // use a macro to circumvent the type system
                     macro_rules! csync {
                         ( $get_src:expr ) => {
@@ -145,7 +149,7 @@ impl<'a> Action<'a> {
                                 $get_src,
                                 &mut fopen_w(&tmp_dest)?,
                                 key_hash,
-                                &file_hash.0,
+                                &src_hash.0,
                             )?
                         };
                     };
@@ -179,12 +183,7 @@ impl<'a> Action<'a> {
 
         match &self {
             Action::Encode {
-                dest,
-                file_type,
-                src,
-                syncer_spec,
-                action_spec,
-                ..
+                dest, file_type, src, ..
             } => {
                 remove(&tmp_dest)?;
                 let (_, action_spec) = csync_decrypt(

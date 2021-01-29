@@ -167,22 +167,7 @@ where
 }
 
 ///
-impl<R> CryptEncoder<R> for TextEncoder<R>
-where
-    R: Read,
-{
-    ///
-    #[inline]
-    fn get_inner(self) -> Option<R> {
-        Some(self.source.into_inner())
-    }
-
-    ///
-    #[inline]
-    fn get_inner_ref(&self) -> Option<&R> {
-        None
-    }
-}
+impl<R> CryptEncoder<R> for TextEncoder<R> where R: Read {}
 
 ///////////////////////////////////////////////////////////////
 
@@ -225,22 +210,7 @@ where
 }
 
 ///
-impl<R> CryptEncoder<R> for TextDecoder<R>
-where
-    R: Read,
-{
-    ///
-    #[inline]
-    fn get_inner(self) -> Option<R> {
-        Some(self.decoder.source.into_inner())
-    }
-
-    ///
-    #[inline]
-    fn get_inner_ref(&self) -> Option<&R> {
-        None
-    }
-}
+impl<R> CryptEncoder<R> for TextDecoder<R> where R: Read {}
 
 #[cfg(test)]
 mod tests {

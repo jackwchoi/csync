@@ -5,7 +5,7 @@ use std::{
     collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
-    time::{Duration, Instant, SystemTime},
+    time::SystemTime,
 };
 use walkdir::{DirEntry, WalkDir};
 
@@ -80,7 +80,7 @@ macro_rules! generate_incremental_build_success_test_func {
     ( $fn_name:ident, $root_tmpdir:expr, $files_to_create:expr, $rel_change_set:expr, $key:literal ) => {
         #[test]
         fn $fn_name() {
-            let root_tmpdir = $root_tmpdir;
+            let _root_tmpdir = $root_tmpdir;
             let files_to_create = $files_to_create;
 
             // same keys, so it shouldn't fail from mismatch
@@ -94,13 +94,11 @@ macro_rules! generate_incremental_build_success_test_func {
             let source = tmpdir!().unwrap();
             let source = source.path();
             create_files(&source, &files_to_create);
-            let source_snapshot_0 = snapshot(&source);
             let source_basename = basename(&source).unwrap();
 
             //
             let out_dir = tmpdir!().unwrap();
             let out_dir = out_dir.path();
-            let out_dir_snapshot_0 = snapshot(&out_dir);
             let out_dir_basename = basename(&out_dir).unwrap();
             //
             let dec_dir_1 = tmpdir!().unwrap();
@@ -143,8 +141,6 @@ macro_rules! generate_incremental_build_success_test_func {
 
             // initial encryption from `source` -> `out_dir`
             encrypt!({ |_| true });
-            let source_snapshot_1 = snapshot(&source);
-            let out_dir_snapshot_1 = snapshot(&out_dir);
 
             decrypt!(source, out_dir, dec_dir_1);
             let dec_dir_1_snapshot = snapshot(&dec_dir_1);
@@ -194,8 +190,6 @@ macro_rules! generate_incremental_build_success_test_func {
 
             // incremental encryption from `source` -> `out_dir`
             encrypt!({ |path| { source_diff_4_minus_3_mod_created.contains(path) } });
-            let source_snapshot_2 = snapshot(&source);
-            let out_dir_snapshot_2 = snapshot(&out_dir);
 
             // decrypt the incrementally encrypted result to a different directory
             // to check that deleted files are correctly reflected
@@ -234,7 +228,7 @@ macro_rules! generate_incremental_build_success_test_func {
             // look through `out_dir` and separate files into two sets:
             // 1. those that were modified after `time_after_initial_enc`
             // 2. those that were modified before
-            let (unchanged, changed): (HashSet<_>, HashSet<_>) = csync_files(&out_dir)
+            let (_, changed): (HashSet<_>, HashSet<_>) = csync_files(&out_dir)
                 .map(|de| {
                     let metadata = de.metadata().unwrap();
                     (metadata.modified().unwrap(), subpath(de.path(), &out_dir).unwrap())
@@ -294,7 +288,6 @@ macro_rules! generate_incremental_build_success_test_func {
                         _ => (),
                     }
                 });
-            let original_w_modified_files_snapshot = snapshot(&original_w_modified_files);
 
             //
             let out_dir_w_modified_files_tmpd = tmpdir!().unwrap();
@@ -315,8 +308,6 @@ macro_rules! generate_incremental_build_success_test_func {
                     };
                 }
             });
-            let out_dir_w_modified_files_snapshot = snapshot(&out_dir_w_modified_files);
-
             let tmpout = tmpdir!().unwrap();
             let tmpout = tmpout.path();
             // decrypt this, and it should only contain newly created / modified files
@@ -352,6 +343,11 @@ mod deletions {
     // │  │  ├── d2/
     // │  │  └── f1
     // │  ├── d4/
+    // │  │  ├── f3
+    // │  │  └── f4
+    // │  ├── d5/
+    // │  │  ├── d6/
+    // │  │  └── d7/
     // │  └── f2
     // ├── d3/
     // └── f0
@@ -361,12 +357,31 @@ mod deletions {
     // ./d0/d1/d2/
     // ./d0/d1/f1
     // ./d0/d4/
+    // ./d0/d4/f3
+    // ./d0/d4/f4
+    // ./d0/d5/d6
+    // ./d0/d5/d7
+    // ./d0/d5/d8
     // ./d0/f2
     // ./d3/
     // ./f0
     macro_rules! paths {
         () => {
-            vec!["d0/", "d0/d1/", "d0/d1/d2/", "d0/d1/f1", "d0/d4/", "d0/f2", "d3/", "f0"]
+            vec![
+                "d0/",
+                "d0/d1/",
+                "d0/d1/d2/",
+                "d0/d1/f1",
+                "d0/d4/",
+                "d0/d4/f3",
+                "d0/d4/f4",
+                "d0/d5/d6/",
+                "d0/d5/d7/",
+                "d0/d5/d8/",
+                "d0/f2",
+                "d3/",
+                "f0",
+            ]
         };
     }
 
@@ -410,14 +425,33 @@ mod deletions {
         hashset![delete!("d0/d1/f1")],
         "Jgc99KQ2CifNNeFpTxzMfiAxMNw6aHNvNYq7hGRfMW4wU3fuPPa4XUF1NdU3LQ5s"
     );
+    //
+    generate_incremental_build_success_test_func!(
+        nested_dir_of_files,
+        tmpdir!().unwrap(),
+        paths!(),
+        hashset![delete!("d0/d4/"), delete!("d0/d4/f3"), delete!("d0/d4/f4")],
+        "FpNquL7nH1ycnsWeMvvyUUH1gwRmdUzp5KIYWc45z9mDmlHrgir2LYir18BoNesI"
+    );
+    //
+    generate_incremental_build_success_test_func!(
+        nested_dir_of_empty_dirs,
+        tmpdir!().unwrap(),
+        paths!(),
+        hashset![
+            delete!("d0/d5/"),
+            delete!("d0/d5/d6/"),
+            delete!("d0/d5/d7/"),
+            delete!("d0/d5/d8/")
+        ],
+        "FpNquL7nH1ycnsWeMvvyUUH1gwRmdUzp5KIYWc45z9mDmlHrgir2LYir18BoNesI"
+    );
 
     // nested_dir_of_empty_dirs
-    // nested_dir_of_files
     // nested_dir_of_all
 }
 
 /*
-"FpNquL7nH1ycnsWeMvvyUUH1gwRmdUzp5KIYWc45z9mDmlHrgir2LYir18BoNesI"
 "b1VV1nNCmwPKS2cIu8CFEHgg8HsSa1AOtfhjfzCNr2gEfmPaSrmOc33N1slcb5Im"
 "FLyPjJfFfRqjZsiEudkbJDcxtWntvVPtcgyYzF9Gz7OcvKWSU34XQEePvwyJXuKX"
 "xOsHKomPrPsdIuf7lynKZaZKQrv60vHQ9WkYDvPWSgfJrDEm7T2A4izPvHSwwdOH"

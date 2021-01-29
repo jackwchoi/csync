@@ -299,13 +299,6 @@ where
                 None => plaintext.read_all_to(&mut std::io::sink())?,
             };
 
-            /*
-            let computed_auth_sig = plaintext
-                .get_inner().unwrap()
-                .get_inner_ref().unwrap()
-                .get_inner_ref().unwrap()
-                .get_result().unwrap();
-            */
             let computed_auth_sig = receiver.recv().unwrap();
             match auth_sig == computed_auth_sig {
                 true => Ok(()),

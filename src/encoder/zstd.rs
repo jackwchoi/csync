@@ -43,22 +43,7 @@ where
 }
 
 ///
-impl<R> CryptEncoder<R> for ZstdEncoder<R>
-where
-    R: Read,
-{
-    ///
-    #[inline]
-    fn get_inner(self) -> Option<R> {
-        None
-    }
-
-    ///
-    #[inline]
-    fn get_inner_ref(&self) -> Option<&R> {
-        Some(self.encoder.get_ref().get_ref())
-    }
-}
+impl<R> CryptEncoder<R> for ZstdEncoder<R> where R: Read {}
 
 //////////////////////////////////////////////////////
 
@@ -95,22 +80,7 @@ where
 }
 
 ///
-impl<R> CryptEncoder<R> for ZstdDecoder<R>
-where
-    R: Read,
-{
-    ///
-    #[inline]
-    fn get_inner(self) -> Option<R> {
-        None
-    }
-
-    ///
-    #[inline]
-    fn get_inner_ref(&self) -> Option<&R> {
-        Some(self.decoder.get_ref().get_ref())
-    }
-}
+impl<R> CryptEncoder<R> for ZstdDecoder<R> where R: Read {}
 
 #[cfg(test)]
 mod tests {

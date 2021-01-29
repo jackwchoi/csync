@@ -123,22 +123,7 @@ macro_rules! cryptor {
         }
 
         ///
-        impl<R> CryptEncoder<R> for $struct_name<R>
-        where
-            R: Read,
-        {
-            ///
-            #[inline]
-            fn get_inner(self) -> Option<R> {
-                Some(self.source.into_inner())
-            }
-
-            ///
-            #[inline]
-            fn get_inner_ref(&self) -> Option<&R> {
-                Some(self.source.get_ref())
-            }
-        }
+        impl<R> CryptEncoder<R> for $struct_name<R> where R: Read {}
     };
 }
 

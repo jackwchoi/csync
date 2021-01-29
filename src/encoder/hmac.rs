@@ -80,19 +80,4 @@ where
 }
 
 ///
-impl<R> CryptEncoder<R> for HmacEncoder<R>
-where
-    R: Read,
-{
-    ///
-    #[inline]
-    fn get_inner(self) -> Option<R> {
-        Some(self.source.into_inner())
-    }
-
-    ///
-    #[inline]
-    fn get_inner_ref(&self) -> Option<&R> {
-        None
-    }
-}
+impl<R> CryptEncoder<R> for HmacEncoder<R> where R: Read {}
