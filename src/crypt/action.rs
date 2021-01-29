@@ -17,7 +17,7 @@ use std::{
 /// Conceptually a mapping from some path `src` to a different path `dest`.
 ///
 /// `src` and `dest` are guarantede to be unique
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Action<'a> {
     Encode {
         dest: PathBuf,
@@ -109,18 +109,26 @@ impl<'a> Action<'a> {
         //
         create_dir_all_if_nexists(&action_arena)?;
 
-        match &self {
+        //for i in 0..RETRY_NUM as usize {
+        //}
+        let run = |action| match &action {
             Action::Encode { syncer_spec, .. } => match syncer_spec {
-                SyncerSpec::Encrypt { .. } => self.encrypt(&action_arena, key_hash),
-                SyncerSpec::Decrypt { .. } => self.decrypt(&action_arena, key_hash),
+                SyncerSpec::Encrypt { .. } => action.encrypt(&action_arena, key_hash),
+                SyncerSpec::Decrypt { .. } => action.decrypt(&action_arena, key_hash),
                 _ => todo!(),
             },
             Action::Delete { path, .. } => match std::fs::remove_file(path) {
-                Ok(_) => Ok(self),
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(self),
+                Ok(_) => Ok(action),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(action),
                 Err(err) => Err(err)?,
             },
-        }
+        };
+
+        let init_val = run(self.clone());
+        (0..RETRY_NUM - 1).fold(init_val, |acc, _| match acc {
+            Ok(_) => acc,
+            Err(_) => run(self.clone()),
+        })
     }
 
     ///

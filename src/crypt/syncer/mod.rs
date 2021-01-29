@@ -55,7 +55,7 @@ use walkdir::WalkDir;
 /// Then the following properties of `csync` holds:
 /// 1. Runtime complexity grows linearly with `n`, in other words `O(n)`
 /// 1. Memory usage grows linearly with `k` but __CONSTANT with respect to `n`__, in other words `O(k)`.
-///     
+///
 /// # Exapmle
 ///
 /// TODO

@@ -24,6 +24,8 @@ pub const DEFAULT_ZSTD_LEVEL_STR: &str = "3"; // same as the `zstd` executable
 
 pub const FILE_SUFFIX: &str = "csync"; // extension for encrypted files
 
+pub const RETRY_NUM: u8 = 4;
+
 #[cfg(test)]
 mod tests {
     use super::*;
