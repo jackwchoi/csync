@@ -139,12 +139,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "colmac"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1da4e37c21ebdbd8e0be89152ac2b037b277cc39ef27bbfe74ad37cb9567bca5"
-
-[[package]]
 name = "cpuid-bool"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -212,11 +206,11 @@ name = "csync"
 version = "0.1.0"
 dependencies = [
  "bincode",
- "colmac",
  "data-encoding",
  "data-encoding-macro",
  "isatty",
  "itertools 0.8.2",
+ "maplit",
  "memchr",
  "openssl",
  "rand_chacha",
@@ -498,6 +492,12 @@ checksum = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 dependencies = [
  "cfg-if",
 ]
+
+[[package]]
+name = "maplit"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "maybe-uninit"

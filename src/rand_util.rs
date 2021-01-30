@@ -129,7 +129,7 @@ macro_rules! rng_seed {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use itertools::Itertools;
 
     ///
     #[test]
@@ -137,23 +137,17 @@ mod tests {
         //
         (0..10).map(|t| 1 << t).for_each(|num_bytes| {
             //
-            assert_eq!(
-                //
-                1,
-                //
-                (0..4)
-                    .map(|_| {
-                        // create `num_bytes` number of random bytes, with the same seed
-                        rng_seed!(
-                            &sha512!(&b"8MUbwkVc1bKCUQmyXi5zlYvdlThsBEfxrmomSkIeAoFG3VsCWpQIyFC8W5D1R5R2"
-                                .to_vec()
-                                .into()),
-                            num_bytes
-                        )
-                    })
-                    .collect::<HashSet<_>>()
-                    .len()
-            );
+            assert!((0..4)
+                .map(|_| {
+                    // create `num_bytes` number of random bytes, with the same seed
+                    rng_seed!(
+                        &sha512!(&b"8MUbwkVc1bKCUQmyXi5zlYvdlThsBEfxrmomSkIeAoFG3VsCWpQIyFC8W5D1R5R2"
+                            .to_vec()
+                            .into()),
+                        num_bytes
+                    )
+                })
+                .all_equal());
         });
     }
 

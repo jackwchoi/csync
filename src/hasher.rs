@@ -105,6 +105,7 @@ pub fn pbkdf2_custom(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itertools::Itertools;
     use rayon::prelude::*;
     use ring::pbkdf2::PBKDF2_HMAC_SHA512;
     use std::collections::HashSet;
@@ -116,10 +117,9 @@ mod tests {
 
     #[test]
     fn deterministic_hash_is_deterministic() {
-        let hashes: HashSet<_> = (0..8)
+        assert!((0..8)
             .map(|_| deterministic_hash(b"eFCP7Na7MQxw6e0txvqVcC8BENvcxzZkbi3mafbXI4aNL8VVor8xjjgMPJahIRib".to_vec()))
-            .collect();
-        assert_eq!(hashes.len(), 1);
+            .all_equal());
     }
 
     ///

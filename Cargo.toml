@@ -30,7 +30,7 @@ zstd = "^0.4"
 zxcvbn = "2"
 
 [dev-dependencies]
-colmac = "^0.1"
+maplit = "^1"
 regex = "1"
 
 # basically [profile.release] with all debug settings `on`

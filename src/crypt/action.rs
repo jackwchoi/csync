@@ -9,7 +9,6 @@ use crate::{
 };
 use std::{
     fmt::Debug,
-    fs::{metadata, rename, File, Permissions},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
@@ -50,7 +49,7 @@ impl<'a> Action<'a> {
     ) -> CsyncResult<Action<'a>> {
         macro_rules! get_unix_mode {
             () => {
-                Some(metadata(src)?.permissions().mode())
+                Some(std::fs::metadata(src)?.permissions().mode())
             };
         };
 
@@ -177,7 +176,7 @@ impl<'a> Action<'a> {
                 };
 
                 // swap
-                rename(tmp_dest, &dest)?;
+                std::fs::rename(tmp_dest, &dest)?;
 
                 Ok(self)
             }
@@ -214,11 +213,11 @@ impl<'a> Action<'a> {
 
                 // set permission bits of `tmp_dest`
                 {
-                    let permission = Permissions::from_mode(action_spec.get_unix_mode().unwrap());
-                    File::open(&tmp_dest)?.set_permissions(permission)?;
+                    let permission = std::fs::Permissions::from_mode(action_spec.get_unix_mode().unwrap());
+                    std::fs::File::open(&tmp_dest)?.set_permissions(permission)?;
                 }
 
-                match rename(&tmp_dest, &dest) {
+                match std::fs::rename(&tmp_dest, &dest) {
                     Ok(_) => Ok(self),
                     Err(_) if *file_type == FileType::Dir && dest.is_dir() => Ok(self),
                     Err(err) => Err(err)?,

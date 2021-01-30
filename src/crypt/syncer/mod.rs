@@ -73,11 +73,6 @@ pub struct Syncer {
     inverse_syncer_opt: Option<Box<Syncer>>,
 }
 
-#[derive(Debug)]
-pub struct SyncerResults<T> {
-    owned_data: Option<T>,
-}
-
 ///
 impl Syncer {
     /// # Returns
@@ -451,7 +446,6 @@ impl Syncer {
         }
     }
 
-    // TODO think about the performance implications of rfc and etc
     ///
     pub fn sync_dec_dry(&self) -> CsyncResult<impl ParallelIterator<Item = CsyncResult<Action>>> {
         match &self.spec {
@@ -508,10 +502,7 @@ fn load_syncer_action_spec(source: &Path) -> CsyncResult<(SyncerSpec, ActionSpec
                 .into_iter()
                 .filter_map(|entry| match entry.map(walkdir::DirEntry::into_path) {
                     Ok(pbuf) => match pbuf.extension().map(OsStr::to_str) {
-                        Some(Some("csync")) => match crate::crypt::util::load_syncer_action_specs(&pbuf) {
-                            Ok(specs) => Some(specs),
-                            _ => None,
-                        },
+                        Some(Some("csync")) => crate::crypt::util::load_syncer_action_specs(&pbuf).ok(),
                         _ => None,
                     },
                     _ => None,

@@ -21,6 +21,12 @@ pub struct RehashedKey(pub CryptoSecureBytes);
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct CryptoSecureBytes(pub SecureBytes);
 
+/*
+trait ConstantEquality {
+    fn constant_equality
+}
+*/
+
 ///
 /// # Comparison using `==`
 ///

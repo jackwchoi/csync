@@ -1,6 +1,6 @@
 use crate::{prelude::*, test_util::*, tests_e2e::success::util::*, util::*};
-use colmac::*;
 use itertools::{Either, Itertools};
+use maplit::*;
 use std::{
     collections::HashSet,
     io::Write,
@@ -359,6 +359,7 @@ mod deletions {
     // ./d0/d4/
     // ./d0/d4/f3
     // ./d0/d4/f4
+    // ./d0/d5/"
     // ./d0/d5/d6
     // ./d0/d5/d7
     // ./d0/d5/d8
@@ -375,6 +376,7 @@ mod deletions {
                 "d0/d4/",
                 "d0/d4/f3",
                 "d0/d4/f4",
+                "d0/d5/",
                 "d0/d5/d6/",
                 "d0/d5/d7/",
                 "d0/d5/d8/",
@@ -390,7 +392,7 @@ mod deletions {
         delete_nothing,
         tmpdir!().unwrap(),
         paths!(),
-        hashset![],
+        hashset! {},
         "dcq100mDxK2f1slccaE5u6r49GrH5X3KjTgBXQJGEhaKJZk8EWqNVVTw5t9g7qqL"
     );
     //
@@ -398,7 +400,7 @@ mod deletions {
         delete_toplevel_file,
         tmpdir!().unwrap(),
         paths!(),
-        hashset![delete!("f0")],
+        hashset! {delete!("f0")},
         "80G3L0ybIYpzgdHbFS3YXGCvCi1e8Tc0stuQ26T8T7mKvttF0wxvoMcYNRiFSpKJ"
     );
     //
@@ -406,7 +408,7 @@ mod deletions {
         delete_toplevel_empty_dir,
         tmpdir!().unwrap(),
         paths!(),
-        hashset![delete!("d3/")],
+        hashset! {delete!("d3/")},
         "aQYr0DxQbYsGxA5eQPlbdwd78lXYn8uyixSd7ci59KBMRFAjAi3HCtt0z1KvYT1u"
     );
     //
@@ -414,7 +416,7 @@ mod deletions {
         nested_empty_dir,
         tmpdir!().unwrap(),
         paths!(),
-        hashset![delete!("d0/d1/d2/")],
+        hashset! {delete!("d0/d1/d2/")},
         "B9WlmZZbRThjGwUyypFz33jUcvxRKdH827X3PKzdFxODpaaTFvFRh3HvgW418fTU"
     );
     //
@@ -422,7 +424,7 @@ mod deletions {
         nested_file,
         tmpdir!().unwrap(),
         paths!(),
-        hashset![delete!("d0/d1/f1")],
+        hashset! {delete!("d0/d1/f1")},
         "Jgc99KQ2CifNNeFpTxzMfiAxMNw6aHNvNYq7hGRfMW4wU3fuPPa4XUF1NdU3LQ5s"
     );
     //
@@ -430,7 +432,7 @@ mod deletions {
         nested_dir_of_files,
         tmpdir!().unwrap(),
         paths!(),
-        hashset![delete!("d0/d4/"), delete!("d0/d4/f3"), delete!("d0/d4/f4")],
+        hashset! {delete!("d0/d4/"), delete!("d0/d4/f3"), delete!("d0/d4/f4")},
         "FpNquL7nH1ycnsWeMvvyUUH1gwRmdUzp5KIYWc45z9mDmlHrgir2LYir18BoNesI"
     );
     //
@@ -438,21 +440,38 @@ mod deletions {
         nested_dir_of_empty_dirs,
         tmpdir!().unwrap(),
         paths!(),
-        hashset![
+        hashset! {
             delete!("d0/d5/"),
             delete!("d0/d5/d6/"),
             delete!("d0/d5/d7/"),
             delete!("d0/d5/d8/")
-        ],
+        },
         "FpNquL7nH1ycnsWeMvvyUUH1gwRmdUzp5KIYWc45z9mDmlHrgir2LYir18BoNesI"
     );
-
-    // nested_dir_of_empty_dirs
-    // nested_dir_of_all
+    //
+    generate_incremental_build_success_test_func!(
+        nested_dir_of_all,
+        tmpdir!().unwrap(),
+        paths!(),
+        hashset! {
+            delete!("d0/"),
+            delete!("d0/d1/"),
+            delete!("d0/d1/d2/"),
+            delete!("d0/d1/f1"),
+            delete!("d0/d4/"),
+            delete!("d0/d4/f3"),
+            delete!("d0/d4/f4"),
+            delete!("d0/d5/"),
+            delete!("d0/d5/d6/"),
+            delete!("d0/d5/d7/"),
+            delete!("d0/d5/d8/"),
+            delete!("d0/f2")
+        },
+        "b1VV1nNCmwPKS2cIu8CFEHgg8HsSa1AOtfhjfzCNr2gEfmPaSrmOc33N1slcb5Im"
+    );
 }
 
 /*
-"b1VV1nNCmwPKS2cIu8CFEHgg8HsSa1AOtfhjfzCNr2gEfmPaSrmOc33N1slcb5Im"
 "FLyPjJfFfRqjZsiEudkbJDcxtWntvVPtcgyYzF9Gz7OcvKWSU34XQEePvwyJXuKX"
 "xOsHKomPrPsdIuf7lynKZaZKQrv60vHQ9WkYDvPWSgfJrDEm7T2A4izPvHSwwdOH"
 "wHxZS6khMOgo80J3JfepWPIG1ENuvQsfoMezDCQhBvVHy1MicBG16cnpBMJZn9sS"

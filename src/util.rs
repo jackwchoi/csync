@@ -241,26 +241,6 @@ pub fn u32_to_u8s(reg: u32) -> Vec<u8> {
         .collect()
 }
 
-/// check if the two iterators are equivalent
-pub fn iter_eq<I, T>(mut iter_a: I, mut iter_b: I) -> bool
-where
-    I: Iterator<Item = T>,
-    T: Eq,
-{
-    loop {
-        let opt_a = iter_a.next();
-        let opt_b = iter_b.next();
-
-        match (opt_a, opt_b) {
-            (None, None) => break true,
-            (a, b) => match a == b {
-                true => (),
-                false => break false,
-            },
-        }
-    }
-}
-
 /// read exactly `count` number of bytes from src
 /// TODO optimize using tricks in read_until?
 pub fn read_exact<R>(count: usize, src: &mut R) -> CsyncResult<Vec<u8>>
@@ -401,26 +381,6 @@ mod tests {
                     assert_eq!(result_opt, None);
                 });
         }
-    }
-
-    ///
-    #[test]
-    fn iter_eq_str() {
-        let data = vec![
-            "",
-            "*",
-            "234",
-            "RDZjpbyeUEVPb9RbF2C5WbQ3KhKRiMC1",
-            "MDqXKdxp9bNpyDS0LE1FXBWCX6ui5FF8ZRsbDl7outwGEcE0VsaziLsfVkQDguSC",
-        ];
-
-        data.par_iter().for_each(|a| {
-            data.par_iter().for_each(|b| {
-                let a_chars = a.chars();
-                let b_chars = b.chars();
-                assert_eq!(iter_eq(a_chars, b_chars), a == b);
-            })
-        });
     }
 
     ///

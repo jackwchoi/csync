@@ -114,7 +114,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use colmac::*;
+    use maplit::*;
     use rayon::{iter::ParallelBridge, prelude::*};
     use std::{collections::HashSet, fs::Permissions, os::unix::fs::PermissionsExt, path::PathBuf};
     use walkdir::{DirEntry, WalkDir};
@@ -236,7 +236,7 @@ mod tests {
             let tmpd_path = tmpd.path();
 
             let result: HashSet<_> = walk(tmpd_path);
-            let expected: HashSet<_> = hashset![tmpd_path.to_path_buf()];
+            let expected = hashset! {tmpd_path.to_path_buf()};
             assert_eq!(expected.len(), 1);
             assert_eq!(result, expected);
         }

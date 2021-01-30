@@ -178,7 +178,7 @@ where
             let bytes_a = bytes(path_a);
             let bytes_b = bytes(path_b);
 
-            assert!(iter_eq(bytes_a, bytes_b));
+            itertools::assert_equal(bytes_a, bytes_b);
         }
         _ => panic!(),
     }

@@ -247,5 +247,5 @@ cargo install csync
 1. don't show diag when decrypting
 
 
-1. hash based change detection
-1. have authenticated encoder return result through mpsc
+
+1. use https://docs.rs/secrecy/0.7.0/secrecy/ instead of secstr
