@@ -109,31 +109,13 @@ impl Syncer {
                     true => csync_err!(SourceEqOutdir, $source.to_path_buf())?,
                     //
                     false => {
-                        let (syncer_spec, action_spec) = load_syncer_action_spec($metadata_par_dir)?;
-
-                        let derived_key = match &syncer_spec {
-                            SyncerSpec::Encrypt {
-                                key_deriv_spec,
-                                verbose,
-                                ..
-                            } => {
-                                let (derived_key, _) = time!(
-                                    *verbose,
-                                    "Generating/authenticating the derived key",
-                                    key_deriv_spec.derive(&init_key.0 .0)?
-                                );
-                                derived_key
-                            }
-                            _ => panic!("Loaded metadata should only be of the variant `SyncerSpec::Encrypt`"),
-                        };
-                        action_spec.verify_derived_key(&derived_key)?;
+                        let (syncer_spec, _, derived_key) = load_syncer_action_spec($metadata_par_dir, init_key)?;
 
                         match spec_ext {
                             //
                             SyncerSpecExt::Encrypt { .. } => {
                                 Syncer::with_spec(syncer_spec, init_key.clone(), Some(derived_key))
                             }
-                            //
                             SyncerSpecExt::Decrypt { .. } => match syncer_spec {
                                 //
                                 SyncerSpec::Encrypt {
@@ -203,6 +185,7 @@ impl Syncer {
                         //
                         Ok(syncer)
                     }
+                    Err(CsyncErr::AuthenticationFail) => csync_err!(AuthenticationFail)?,
                     //
                     Err(_) => {
                         // if from_dir failed, outdir must either be empty or non-existent
@@ -471,9 +454,7 @@ impl Syncer {
 
 // Load metadata from an existing `csync` directory.
 //
-// TODO if syncer is set to encryption, make sure to do authentication check
-// TODO generate key here, and return Err(AuthenticationErr) and do special check to abort
-fn load_syncer_action_spec(source: &Path) -> CsyncResult<(SyncerSpec, ActionSpec)> {
+fn load_syncer_action_spec(source: &Path, init_key: &InitialKey) -> CsyncResult<(SyncerSpec, ActionSpec, DerivedKey)> {
     match source.exists() {
         true => {
             let result_opt = WalkDir::new(source)
@@ -486,11 +467,35 @@ fn load_syncer_action_spec(source: &Path) -> CsyncResult<(SyncerSpec, ActionSpec
                     },
                     _ => None,
                 })
+                .filter_map(|(syncer_spec, action_spec)| {
+                    let derived_key_res = match &syncer_spec {
+                        SyncerSpec::Encrypt {
+                            key_deriv_spec, verbose, ..
+                        } => {
+                            time!(
+                                *verbose,
+                                "Generating/authenticating the derived key",
+                                key_deriv_spec.derive(&init_key.0 .0)
+                            )
+                            .0
+                        }
+                        _ => panic!("Loaded metadata should only be of the variant `SyncerSpec::Encrypt`"),
+                    };
+                    match derived_key_res {
+                        Ok(derived_key) => match action_spec.verify_derived_key(&derived_key) {
+                            Ok(_) => Some(Ok((syncer_spec, action_spec, derived_key))),
+                            Err(CsyncErr::AuthenticationFail) => Some(csync_err!(AuthenticationFail)),
+                            Err(_) => None,
+                        },
+                        Err(_) => None,
+                    }
+                })
                 .nth(0);
 
             match result_opt {
-                Some(specs) => Ok(specs),
-                None => csync_err!(MetadataLoadFailed, "Could not open any of the csync files".to_string()),
+                Some(Ok((syncer_spec, action_spec, derived_key))) => Ok((syncer_spec, action_spec, derived_key)),
+                Some(Err(CsyncErr::AuthenticationFail)) => csync_err!(AuthenticationFail)?,
+                Some(Err(_)) | None => csync_err!(MetadataLoadFailed, "Could not open any of the csync files".to_string()),
             }
         }
         false => csync_err!(ControlFlow),
