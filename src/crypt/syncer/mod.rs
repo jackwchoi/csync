@@ -126,10 +126,8 @@ impl Syncer {
                             }
                             _ => panic!("Loaded metadata should only be of the variant `SyncerSpec::Encrypt`"),
                         };
-
                         action_spec.verify_derived_key(&derived_key)?;
 
-                        // let hashed_key = Syncer::verify_syncer_spec(&syncer_spec, &action_spec, &init_key)?;
                         match spec_ext {
                             //
                             SyncerSpecExt::Encrypt { .. } => {
@@ -319,28 +317,6 @@ impl Syncer {
             } => {
                 self.check_rep();
 
-                /*
-                let decrypt_spec = inverse_spec(&self.spec).unwrap();
-                let derived_key = self.derived_key.clone();
-                let decryptor = Syncer::with_spec(decrypt_spec, self.init_key.clone(), Some(derived_key))?;
-                let deleting_actions = decryptor.sync_dec_dry()?.filter_map(|action_res| match action_res.unwrap() {
-                    Action::Encode {
-                        dest,
-                        src,
-                        action_spec,
-                        syncer_spec,
-                        file_type,
-                    } => match dest.exists() {
-                        true => None,
-                        false => Some(Ok(Action::Delete { src, file_type })),
-                    },
-                });
-                // ideas:
-                // 1. use arc
-                // 1. instead of returning an iterator, return a struct with an ownership of
-                //    decryptor, and have this impl ParallelIterator
-                */
-
                 //
                 let other_actions = meta_map(source).filter_map(move |meta_res| match meta_res {
                     Ok((_, src_pbuf, perms, src_modtime, file_type)) => {
@@ -494,6 +470,9 @@ impl Syncer {
 }
 
 // Load metadata from an existing `csync` directory.
+//
+// TODO if syncer is set to encryption, make sure to do authentication check
+// TODO generate key here, and return Err(AuthenticationErr) and do special check to abort
 fn load_syncer_action_spec(source: &Path) -> CsyncResult<(SyncerSpec, ActionSpec)> {
     match source.exists() {
         true => {

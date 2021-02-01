@@ -72,6 +72,13 @@ impl<'a> Action<'a> {
         }
     }
 
+    // # Returns
+    //
+    // 1. `Ok(Some(true))` if `dest` is out of date, and this manifest is necessary
+    // 1. `Ok(Some(false)` if `dest` in NOT out of date, and this manifest is unnecessary
+    // 1. `Ok(None)` if the concept of `out of date` does not apply and the result of this function
+    //    should be ignored
+    // 1. `Err(_)` if any error occurs
     pub fn out_of_date(&self) -> CsyncResult<Option<bool>> {
         // TODO do hash based checks
         // TODO bake this into csync_*crypt somehow?
