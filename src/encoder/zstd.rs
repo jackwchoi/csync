@@ -37,6 +37,7 @@ where
     R: Read,
 {
     ///
+    #[inline]
     fn read(&mut self, target: &mut [u8]) -> io::Result<usize> {
         self.encoder.read(target)
     }
@@ -74,6 +75,7 @@ where
     R: Read,
 {
     ///
+    #[inline]
     fn read(&mut self, target: &mut [u8]) -> io::Result<usize> {
         self.decoder.read(target)
     }

@@ -43,11 +43,13 @@ where
     T: Copy + Eq + Hash,
 {
     ///
+    #[inline]
     pub fn new(vec: Vec<T>) -> Self {
         Self(SecVec::new(vec))
     }
 
     ///
+    #[inline]
     pub fn unsecure(&self) -> &[T] {
         self.0.unsecure()
     }
@@ -59,6 +61,7 @@ where
     T: Copy + Eq + Hash,
 {
     ///
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.unsecure().hash(state);
     }
@@ -127,6 +130,7 @@ where
     T: Copy + Eq + Hash,
 {
     ///
+    #[inline]
     fn from(vec: &[T]) -> SecureVec<T> {
         vec.to_vec().into()
     }
@@ -137,6 +141,7 @@ where
     T: Copy + Eq + Hash,
 {
     ///
+    #[inline]
     fn from(vec: Vec<T>) -> SecureVec<T> {
         SecureVec::new(vec)
     }
@@ -144,6 +149,7 @@ where
 ///
 impl From<String> for SecureBytes {
     ///
+    #[inline]
     fn from(string: String) -> SecureBytes {
         string.as_bytes().into()
     }
@@ -151,6 +157,7 @@ impl From<String> for SecureBytes {
 ///
 impl From<&str> for SecureBytes {
     ///
+    #[inline]
     fn from(string: &str) -> SecureBytes {
         string.as_bytes().into()
     }

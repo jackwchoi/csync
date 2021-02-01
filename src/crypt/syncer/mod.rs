@@ -78,6 +78,7 @@ impl Syncer {
     /// # Returns
     ///
     /// The specificatino of this syncer.
+    #[inline]
     pub fn get_spec(&self) -> SyncerSpec {
         self.spec.clone()
     }

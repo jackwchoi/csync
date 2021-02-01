@@ -176,6 +176,7 @@ where
 }
 
 /// Conversion from `&Path` to `String` in one shot.
+#[inline]
 pub fn path_as_string<P>(path: P) -> Option<String>
 where
     P: AsRef<Path>,
@@ -184,11 +185,13 @@ where
 }
 
 ///
+#[inline]
 pub fn start_timer() -> Instant {
     Instant::now()
 }
 
 ///
+#[inline]
 pub fn end_timer(time: &Instant) -> Duration {
     time.elapsed()
 }

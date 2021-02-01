@@ -77,22 +77,6 @@ pub fn drng_range(num_bytes: usize, min: u8, max: u8) -> Vec<u8> {
 }
 
 ///
-pub fn ascii_files() -> impl Iterator<Item = PathBuf> {
-    find("src")
-        .map(Result::unwrap)
-        .filter(|pbuf| pbuf.is_file())
-        .map(|pbuf| pbuf.canonicalize().unwrap())
-}
-
-///
-pub fn bin_files() -> impl Iterator<Item = PathBuf> {
-    find(".git")
-        .map(Result::unwrap)
-        .filter(|pbuf| pbuf.is_file())
-        .map(|pbuf| pbuf.canonicalize().unwrap())
-}
-
-///
 fn parent_unwrap_safely<P>(path: &P) -> &Path
 where
     P: AsRef<Path>,

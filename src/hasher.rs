@@ -48,6 +48,7 @@ macro_rules! scrypt {
     };
 }
 
+#[inline]
 pub fn deterministic_hash<T>(key: T) -> CryptoSecureBytes
 where
     T: Into<SecureBytes>,

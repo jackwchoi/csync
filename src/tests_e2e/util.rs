@@ -33,11 +33,13 @@ pub struct SnapshotDiff {
 
 impl Snapshot {
     //
+    #[inline]
     pub fn files(&self) -> HashSet<PathBuf> {
         self.file_map.keys().cloned().collect()
     }
 
     // self is the more recent one
+    #[inline]
     pub fn since(&self, other: &Snapshot) -> SnapshotDiff {
         self.since_with_filter(other, |_| true)
     }
@@ -79,6 +81,7 @@ impl Snapshot {
         }
     }
 
+    #[inline]
     pub fn tree_hash(&self) -> CryptoSecureBytes {
         self.file_map.get(&self.root).unwrap().clone()
     }
@@ -114,6 +117,7 @@ where
 // # Returns
 //
 // `bytes` forcefully converted to `&str`, assuming it's utf8-encoded.
+#[inline]
 pub fn bytes_to_str(bytes: &[u8]) -> &str {
     std::str::from_utf8(bytes).unwrap()
 }
@@ -173,6 +177,7 @@ pub fn check_report_line(line: &str, value: f64, unit: &str) {
 // # Returns
 //
 // An iterator of files in `source` that csync cares about.
+#[inline]
 pub fn get_all_source<P>(source: P) -> impl Iterator<Item = PathBuf>
 where
     P: AsRef<Path>,

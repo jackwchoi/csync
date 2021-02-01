@@ -9,6 +9,7 @@ pub enum AuthenticatorSpec {
 
 ///
 impl Default for AuthenticatorSpec {
+    #[inline]
     fn default() -> Self {
         Self::HmacSha512
     }

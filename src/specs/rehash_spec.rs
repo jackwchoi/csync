@@ -7,6 +7,7 @@ pub struct RehashSpec(KeyDerivSpec);
 
 impl RehashSpec {
     ///
+    #[inline]
     pub fn with_key_deriv_spec(kd_spec: KeyDerivSpec) -> Self {
         Self(kd_spec)
     }

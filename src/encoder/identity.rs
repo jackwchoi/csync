@@ -30,6 +30,7 @@ where
     R: Read,
 {
     ///
+    #[inline]
     fn read(&mut self, mut target: &mut [u8]) -> io::Result<usize> {
         self.src.read(&mut target)
     }
@@ -41,11 +42,13 @@ where
     R: Read,
 {
     ///
+    #[inline]
     fn consume(&mut self, amt: usize) {
         self.src.consume(amt)
     }
 
     ///
+    #[inline]
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.src.fill_buf()
     }
