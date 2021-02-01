@@ -6,16 +6,20 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
-use walkdir::{DirEntry, WalkDir};
+use walkdir::WalkDir;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 enum Change {
+    // create a dir
     CreateDir(PathBuf),
+    // add some random data to this file
     Append(PathBuf),
+    // delete this file/dir
     Delete(PathBuf),
 }
 
 impl Change {
+    //
     pub fn prepend<P>(&self, root: P) -> Self
     where
         P: AsRef<Path>,
@@ -29,6 +33,31 @@ impl Change {
             Change::Append(path) => Change::Append(prepend!(path)),
             Change::CreateDir(path) => Change::CreateDir(prepend!(path)),
             Change::Delete(path) => Change::Delete(prepend!(path)),
+        }
+    }
+
+    //
+    pub fn manifest(&self) {
+        match self {
+            // write some random data to the file
+            Change::Append(path) => {
+                assert!(path.is_file());
+                write!(
+                    std::fs::OpenOptions::new().append(true).open(path).unwrap(),
+                    "c9Z7fHoHRrhFYbbVitnaUoPJjC7siehUXIv6CZEWYaEwAOlJdHODR2a6Mjz8LZdT"
+                )
+                .unwrap();
+            }
+            // just create the dir
+            Change::CreateDir(path) => std::fs::create_dir_all(path).unwrap(),
+            // delete
+            Change::Delete(path) => match path.exists() {
+                true => match path.is_file() {
+                    true => std::fs::remove_file(path).unwrap(),
+                    false => std::fs::remove_dir_all(path).unwrap(),
+                },
+                false => (),
+            },
         }
     }
 }
@@ -52,20 +81,6 @@ where
         });
 }
 
-fn csync_files<P>(root: P) -> impl Iterator<Item = walkdir::DirEntry>
-where
-    P: AsRef<Path>,
-{
-    WalkDir::new(&root)
-        .into_iter()
-        .map(Result::unwrap)
-        .filter(|de| de.file_type().is_file())
-        .filter_map(|de| match de.path().extension() == Some(std::ffi::OsStr::new(FILE_SUFFIX)) {
-            true => Some(de),
-            false => None,
-        })
-}
-
 fn subpaths<P1, P2>(paths: &HashSet<P2>, root: P1) -> HashSet<PathBuf>
 where
     P1: AsRef<Path>,
@@ -85,7 +100,7 @@ where
     .unwrap()
 }
 
-fn cp_r_with_mod_created<P>(source: P, rel_change_set: &HashSet<Change>) -> (tempfile::TempDir, HashSet<PathBuf>)
+fn cp_r_src_with_mod_created<P>(source: P, rel_change_set: &HashSet<Change>) -> (tempfile::TempDir, HashSet<PathBuf>)
 where
     P: AsRef<Path>,
 {
@@ -121,6 +136,7 @@ where
            // .flat_map(|vec| vec.into_iter())
             .collect();
 
+    /*
     // delete all deleted files, so that `original_w_modified_files` only contains
     // created and modified files
     WalkDir::new(&original_w_modified_files)
@@ -139,8 +155,44 @@ where
             }
         });
     //
+    */
 
     (tmpd, modified_files)
+}
+
+fn cp_r_outdir_with_mod_created<P>(outdir: P, changed: &HashSet<PathBuf>) -> (tempfile::TempDir, PathBuf)
+where
+    P: AsRef<Path>,
+{
+    let outdir_basename = basename(&outdir).unwrap();
+
+    let out_dir_w_modified_files_tmpd = tmpdir!().unwrap();
+    let out_dir_w_modified_files_tmpd_path = out_dir_w_modified_files_tmpd.path();
+    cp_r(&outdir, &out_dir_w_modified_files_tmpd_path);
+    let out_dir_w_modified_files = (&out_dir_w_modified_files_tmpd_path).join(&outdir_basename);
+
+    assert!(out_dir_w_modified_files.exists());
+    WalkDir::new(&out_dir_w_modified_files)
+        .into_iter()
+        .map(Result::unwrap)
+        .filter(|de| de.file_type().is_file())
+        .filter_map(|de| match de.path().extension() == Some(std::ffi::OsStr::new(FILE_SUFFIX)) {
+            true => Some(de),
+            false => None,
+        })
+        .for_each(|de| {
+            let pbuf = de.into_path();
+            // need to delete one more after outdirwmodifiedfiles
+            let rel_path = pop_front(subpath(&pbuf, &out_dir_w_modified_files).unwrap());
+            if !changed.contains(&rel_path) {
+                match std::fs::remove_file(&pbuf) {
+                    Ok(_) => (),
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
+                    Err(_) => panic!(),
+                };
+            }
+        });
+    (out_dir_w_modified_files_tmpd, out_dir_w_modified_files)
 }
 
 fn check_deletions<P1, P2>(
@@ -200,10 +252,6 @@ macro_rules! generate_incremental_build_success_test_func {
             //
             let out_dir = tmpdir!().unwrap();
             let out_dir = out_dir.path();
-            let out_dir_basename = basename(&out_dir).unwrap();
-            //
-            let dec_dir_1 = tmpdir!().unwrap();
-            let dec_dir_1 = dec_dir_1.path();
 
             macro_rules! encrypt {
                 ( $source_predicate:block ) => {
@@ -221,24 +269,22 @@ macro_rules! generate_incremental_build_success_test_func {
             }
             macro_rules! decrypt {
                 ( $original:expr, $out_dir:expr, $dec_dir:expr ) => {
-                    let original = $original;
-                    let out_dir = $out_dir;
-                    let dec_dir = $dec_dir;
-                    assert!(original.exists());
-                    assert!(out_dir.exists());
-                    assert!(dec_dir.exists());
                     check_decrypt!(
                         exit_code,
-                        &out_dir,
-                        &dec_dir,
-                        &original,
+                        &$out_dir,
+                        &$dec_dir,
+                        &$original,
                         key_1,
                         key_2,
-                        path_as_str!(&out_dir),
-                        &format!("-o {}", path_as_str!(&dec_dir))
+                        path_as_str!(&$out_dir),
+                        &format!("-o {}", path_as_str!(&$dec_dir))
                     )
                 };
             }
+
+            //
+            let dec_dir_1 = tmpdir!().unwrap();
+            let dec_dir_1 = dec_dir_1.path();
 
             // initial encryption from `source` -> `out_dir`
             encrypt!({ |_| true });
@@ -259,26 +305,7 @@ macro_rules! generate_incremental_build_success_test_func {
 
             let source_snapshot_before_changes = snapshot(&source);
             // actually perform the changes
-            change_set.iter().for_each(|c| match c {
-                // write some random data to the file
-                Change::Append(path) => {
-                    write!(
-                        std::fs::OpenOptions::new().append(true).open(path).unwrap(),
-                        "c9Z7fHoHRrhFYbbVitnaUoPJjC7siehUXIv6CZEWYaEwAOlJdHODR2a6Mjz8LZdT"
-                    )
-                    .unwrap();
-                }
-                // just create the dir
-                Change::CreateDir(path) => std::fs::create_dir_all(path).unwrap(),
-                // delete
-                Change::Delete(path) => match path.exists() {
-                    true => match path.is_file() {
-                        true => std::fs::remove_file(path).unwrap(),
-                        false => std::fs::remove_dir_all(path).unwrap(),
-                    },
-                    false => (),
-                },
-            });
+            change_set.iter().for_each(Change::manifest);
             let source_snapshot_after_changes = snapshot(&source);
 
             let source_changes = source_snapshot_after_changes.since(&source_snapshot_before_changes);
@@ -317,32 +344,15 @@ macro_rules! generate_incremental_build_success_test_func {
                 .map(|p| subpath(&p, &out_dir).unwrap())
                 .collect();
 
-            let (original_w_modified_files, modified_files) = cp_r_with_mod_created(&source, &rel_change_set);
+            let (original_w_modified_files, modified_files) = cp_r_src_with_mod_created(&source, &rel_change_set);
             let original_w_modified_files = original_w_modified_files.path();
 
             if modified_files.len() == 0 {
                 return;
             }
 
-            //
-            let out_dir_w_modified_files_tmpd = tmpdir!().unwrap();
-            let out_dir_w_modified_files_tmpd = out_dir_w_modified_files_tmpd.path();
-            cp_r(&out_dir, &out_dir_w_modified_files_tmpd);
-            let out_dir_w_modified_files = (&out_dir_w_modified_files_tmpd).join(&out_dir_basename);
+            let (_out_dir_w_modified_files_tmpd, out_dir_w_modified_files) = cp_r_outdir_with_mod_created(&out_dir, &changed);
 
-            assert!(out_dir_w_modified_files.exists());
-            csync_files(&out_dir_w_modified_files).for_each(|de| {
-                let pbuf = de.into_path();
-                // need to delete one more after outdirwmodifiedfiles
-                let rel_path = pop_front(subpath(&pbuf, &out_dir_w_modified_files).unwrap());
-                if !changed.contains(&rel_path) {
-                    match std::fs::remove_file(&pbuf) {
-                        Ok(_) => (),
-                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
-                        Err(_) => panic!(),
-                    };
-                }
-            });
             let tmpout = tmpdir!().unwrap();
             let tmpout = tmpout.path();
             // decrypt this, and it should only contain newly created / modified files
