@@ -16,6 +16,24 @@ enum Change {
     Delete(PathBuf),
 }
 
+impl Change {
+    pub fn prepend<P>(&self, root: P) -> Self
+    where
+        P: AsRef<Path>,
+    {
+        macro_rules! prepend {
+            ( $path:expr ) => {
+                root.as_ref().join($path)
+            };
+        }
+        match &self {
+            Change::Append(path) => Change::Append(prepend!(path)),
+            Change::CreateDir(path) => Change::CreateDir(prepend!(path)),
+            Change::Delete(path) => Change::Delete(prepend!(path)),
+        }
+    }
+}
+
 // TODO https://doc.rust-lang.org/std/macro.is_x86_feature_detected.html
 
 //
@@ -68,6 +86,33 @@ where
     .unwrap()
 }
 
+fn check_deletions<P1, P2>(
+    dec_dir_1: P1,
+    dec_dir_2: P2,
+    dec_dir_1_snapshot: &Snapshot,
+    dec_dir_2_snapshot: &Snapshot,
+    rel_change_set: &HashSet<Change>,
+) where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    // check to see if the deletions are reflected
+    let dec_dir_1_rel_paths = subpaths(&dec_dir_1_snapshot.files(), dec_dir_1);
+    let dec_dir_2_rel_paths = subpaths(&dec_dir_2_snapshot.files(), dec_dir_2);
+    let deleted_files_actual: HashSet<_> = dec_dir_1_rel_paths.difference(&dec_dir_2_rel_paths).map(pop_front).collect();
+    //
+    let deleted_files_expect: HashSet<_> = rel_change_set
+        .iter()
+        .filter_map(|c| match c {
+            Change::Delete(path) => Some(path),
+            _ => None,
+        })
+        .cloned()
+        .collect();
+
+    assert_eq!(&deleted_files_actual, &deleted_files_expect, "deleted files don't match");
+}
+
 // 1. encrypt source -> out_dir
 // 1. decrypt out_dir -> dec_dir
 // 1. make changes based on change_set, to source
@@ -105,14 +150,14 @@ macro_rules! generate_incremental_build_success_test_func {
             let dec_dir_1 = dec_dir_1.path();
 
             macro_rules! encrypt {
-                ( $source_pbuf_iter:block ) => {
+                ( $source_predicate:block ) => {
                     check_encrypt!(
                         exit_code,
                         &source,
                         &out_dir,
                         key_1,
                         key_2,
-                        $source_pbuf_iter,
+                        $source_predicate,
                         path_as_str!(source),
                         &format!("-o {}", path_as_str!(&out_dir))
                     )
@@ -143,6 +188,7 @@ macro_rules! generate_incremental_build_success_test_func {
             encrypt!({ |_| true });
 
             decrypt!(source, out_dir, dec_dir_1);
+
             let dec_dir_1_snapshot = snapshot(&dec_dir_1);
 
             let time_after_initial_enc = SystemTime::now();
@@ -152,13 +198,10 @@ macro_rules! generate_incremental_build_success_test_func {
             // change set with absolute paths
             let change_set: HashSet<_> = rel_change_set
                 .iter()
-                .map(|c| match c {
-                    Change::Append(path) => Change::Append(source.join(path)),
-                    Change::CreateDir(path) => Change::CreateDir(source.join(path)),
-                    Change::Delete(path) => Change::Delete(source.join(path)),
-                })
+                .map(|c: &Change| -> Change { c.prepend(&source) })
                 .collect();
-            let source_snapshot_3 = snapshot(&source);
+
+            let source_snapshot_before_changes = snapshot(&source);
             // actually perform the changes
             change_set.iter().for_each(|c| match c {
                 // write some random data to the file
@@ -180,16 +223,14 @@ macro_rules! generate_incremental_build_success_test_func {
                     false => (),
                 },
             });
-            let source_snapshot_4 = snapshot(&source);
-            let source_diff_4_minus_3 = source_snapshot_4.since(&source_snapshot_3);
-            let source_diff_4_minus_3_mod_created: HashSet<_> = source_diff_4_minus_3
-                .added
-                .union(&source_diff_4_minus_3.modified)
-                .cloned()
-                .collect();
+            let source_snapshot_after_changes = snapshot(&source);
+
+            let source_changes = source_snapshot_after_changes.since(&source_snapshot_before_changes);
+            let source_changes_mod_created: HashSet<_> =
+                source_changes.added.union(&source_changes.modified).cloned().collect();
 
             // incremental encryption from `source` -> `out_dir`
-            encrypt!({ |path| { source_diff_4_minus_3_mod_created.contains(path) } });
+            encrypt!({ |path| { source_changes_mod_created.contains(path) } });
 
             // decrypt the incrementally encrypted result to a different directory
             // to check that deleted files are correctly reflected
@@ -201,26 +242,14 @@ macro_rules! generate_incremental_build_success_test_func {
                 //
                 decrypt!(source, out_dir, dec_dir_2);
 
-                // check to see if the deletions are reflected
-                let dec_dir_1_rel_paths = subpaths(&dec_dir_1_snapshot.files(), &dec_dir_1);
-                let dec_dir_2_rel_paths = subpaths(&snapshot(&dec_dir_2).files(), &dec_dir_2);
-                let deleted_files_actual: HashSet<_> = dec_dir_1_rel_paths
-                    .difference(&dec_dir_2_rel_paths)
-                    .map(|p| subpath(p, p.ancestors().filter(|a| a != &Path::new("")).last().unwrap()).unwrap())
-                    .collect();
                 //
-                let deleted_files_expect: HashSet<_> = rel_change_set
-                    .iter()
-                    .filter_map(|c| match c {
-                        Change::Delete(path) => Some(path),
-                        _ => None,
-                    })
-                    .cloned()
-                    .collect();
-
-                assert_eq!(
-                    &deleted_files_actual, &deleted_files_expect,
-                    "deleted files don't match"
+                let dec_dir_2_snapshot = snapshot(&dec_dir_2);
+                check_deletions(
+                    &dec_dir_1,
+                    &dec_dir_2,
+                    &dec_dir_1_snapshot,
+                    &dec_dir_2_snapshot,
+                    &rel_change_set,
                 );
             }
             // now `source` and `out_dir` only contain newly created and modified files
@@ -228,15 +257,16 @@ macro_rules! generate_incremental_build_success_test_func {
             // look through `out_dir` and separate files into two sets:
             // 1. those that were modified after `time_after_initial_enc`
             // 2. those that were modified before
-            let (_, changed): (HashSet<_>, HashSet<_>) = csync_files(&out_dir)
+            let changed: HashSet<_> = csync_files(&out_dir)
                 .map(|de| {
                     let metadata = de.metadata().unwrap();
                     (metadata.modified().unwrap(), subpath(de.path(), &out_dir).unwrap())
                 })
-                .partition_map(|(modified, pbuf)| match time_after_initial_enc < modified {
-                    true => Either::Right(pbuf),
-                    false => Either::Left(pbuf),
-                });
+                .filter_map(|(modified, pbuf)| match time_after_initial_enc < modified {
+                    true => Some(pbuf),
+                    false => None,
+                })
+                .collect();
 
             // create a dir that contains all files from `source` that have been modified
             // during the incremental encryption
@@ -271,6 +301,7 @@ macro_rules! generate_incremental_build_success_test_func {
             if modified_files.len() == 0 {
                 return;
             }
+
             // delete all deleted files, so that `original_w_modified_files` only contains
             // created and modified files
             WalkDir::new(&original_w_modified_files)

@@ -1,4 +1,8 @@
-pub use std::collections::{HashMap, HashSet};
+pub use itertools::Itertools;
+pub use std::{
+    collections::{HashMap, HashSet},
+    io::Write,
+};
 
 use crate::{hasher::deterministic_hash, prelude::*, secure_vec::*, test_util::*, util::*};
 use std::{
