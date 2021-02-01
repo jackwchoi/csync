@@ -97,16 +97,13 @@ where
     let tmpd = tmpdir!().unwrap();
     let tmpd_path = tmpd.path();
     cp_r(&source, &tmpd_path);
-  
+
     //
     let original_w_modified_files = (&tmpd_path).join(&source_basename);
     assert!(original_w_modified_files.exists());
 
-    //
-    (
-        tmpd,
-        // collect only the created and modified files
-        rel_change_set
+    // collect only the created and modified files
+    let modified_files: HashSet<_> = rel_change_set
             .iter()
             .filter_map(|c| match c {
                 Change::CreateDir(rel_path) | Change::Append(rel_path) => {
@@ -114,16 +111,36 @@ where
                     Some(
                         original_w_modified_files
                             .join(rel_path)
-                            .ancestors()
-                            .map(Path::to_path_buf)
-                            .collect::<Vec<_>>(),
+                          //  .ancestors()
+                          //  .map(Path::to_path_buf)
+                          //  .collect::<Vec<_>>(),
                     )
                 }
                 _ => None,
             })
-            .flat_map(|vec| vec.into_iter())
-            .collect(),
-    )
+           // .flat_map(|vec| vec.into_iter())
+            .collect();
+
+    // delete all deleted files, so that `original_w_modified_files` only contains
+    // created and modified files
+    WalkDir::new(&original_w_modified_files)
+        .contents_first(true)
+        .into_iter()
+        .map(Result::unwrap)
+        .map(DirEntry::into_path)
+        .for_each(|pbuf| {
+            let is_modified = modified_files.contains(pbuf.as_path());
+            match (is_modified, pbuf.is_file()) {
+                (false, is_file) if pbuf != original_w_modified_files => match is_file {
+                    true => std::fs::remove_file(&pbuf).unwrap(),
+                    false => std::fs::remove_dir(&pbuf).unwrap(),
+                },
+                _ => (),
+            }
+        });
+    //
+
+    (tmpd, modified_files)
 }
 
 fn check_deletions<P1, P2>(
@@ -306,24 +323,6 @@ macro_rules! generate_incremental_build_success_test_func {
             if modified_files.len() == 0 {
                 return;
             }
-
-            // delete all deleted files, so that `original_w_modified_files` only contains
-            // created and modified files
-            WalkDir::new(&original_w_modified_files)
-                .contents_first(true)
-                .into_iter()
-                .map(Result::unwrap)
-                .map(DirEntry::into_path)
-                .for_each(|pbuf| {
-                    let is_modified = modified_files.contains(pbuf.as_path());
-                    match (is_modified, pbuf.is_file()) {
-                        (false, is_file) if pbuf != original_w_modified_files => match is_file {
-                            true => std::fs::remove_file(&pbuf).unwrap(),
-                            false => std::fs::remove_dir(&pbuf).unwrap(),
-                        },
-                        _ => (),
-                    }
-                });
 
             //
             let out_dir_w_modified_files_tmpd = tmpdir!().unwrap();
