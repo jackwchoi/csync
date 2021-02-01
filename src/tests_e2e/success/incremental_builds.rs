@@ -1,11 +1,10 @@
 use crate::{prelude::*, test_util::*, tests_e2e::success::util::*, util::*};
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use maplit::*;
 use std::{
     collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
-    time::SystemTime,
 };
 use walkdir::{DirEntry, WalkDir};
 
@@ -86,6 +85,47 @@ where
     .unwrap()
 }
 
+fn cp_r_with_mod_created<P>(source: P, rel_change_set: &HashSet<Change>) -> (tempfile::TempDir, HashSet<PathBuf>)
+where
+    P: AsRef<Path>,
+{
+    let source_basename = basename(&source).unwrap();
+    // create a dir that contains all files from `source` that have been modified
+    // during the incremental encryption
+    //
+    // `cp -r "$source" "$original_w_modified_files"`
+    let tmpd = tmpdir!().unwrap();
+    let tmpd_path = tmpd.path();
+    cp_r(&source, &tmpd_path);
+  
+    //
+    let original_w_modified_files = (&tmpd_path).join(&source_basename);
+    assert!(original_w_modified_files.exists());
+
+    //
+    (
+        tmpd,
+        // collect only the created and modified files
+        rel_change_set
+            .iter()
+            .filter_map(|c| match c {
+                Change::CreateDir(rel_path) | Change::Append(rel_path) => {
+                    // workaround the type system
+                    Some(
+                        original_w_modified_files
+                            .join(rel_path)
+                            .ancestors()
+                            .map(Path::to_path_buf)
+                            .collect::<Vec<_>>(),
+                    )
+                }
+                _ => None,
+            })
+            .flat_map(|vec| vec.into_iter())
+            .collect(),
+    )
+}
+
 fn check_deletions<P1, P2>(
     dec_dir_1: P1,
     dec_dir_2: P2,
@@ -139,7 +179,6 @@ macro_rules! generate_incremental_build_success_test_func {
             let source = tmpdir!().unwrap();
             let source = source.path();
             create_files(&source, &files_to_create);
-            let source_basename = basename(&source).unwrap();
 
             //
             let out_dir = tmpdir!().unwrap();
@@ -189,9 +228,9 @@ macro_rules! generate_incremental_build_success_test_func {
 
             decrypt!(source, out_dir, dec_dir_1);
 
+            let out_dir_snapshot_before_initial_enc = snapshot(&out_dir);
             let dec_dir_1_snapshot = snapshot(&dec_dir_1);
-
-            let time_after_initial_enc = SystemTime::now();
+            let out_dir_snapshot_after_initial_enc = snapshot(&out_dir);
 
             // change set with relative paths
             let rel_change_set = $rel_change_set;
@@ -254,49 +293,15 @@ macro_rules! generate_incremental_build_success_test_func {
             }
             // now `source` and `out_dir` only contain newly created and modified files
 
-            // look through `out_dir` and separate files into two sets:
-            // 1. those that were modified after `time_after_initial_enc`
-            // 2. those that were modified before
-            let changed: HashSet<_> = csync_files(&out_dir)
-                .map(|de| {
-                    let metadata = de.metadata().unwrap();
-                    (metadata.modified().unwrap(), subpath(de.path(), &out_dir).unwrap())
-                })
-                .filter_map(|(modified, pbuf)| match time_after_initial_enc < modified {
-                    true => Some(pbuf),
-                    false => None,
-                })
+            let out_dir_diff = out_dir_snapshot_after_initial_enc.since(&out_dir_snapshot_before_initial_enc);
+            let out_dir_diff_mod_created: HashSet<_> = out_dir_diff.added.union(&out_dir_diff.modified).cloned().collect();
+            let changed: HashSet<_> = out_dir_diff_mod_created
+                .into_iter()
+                .map(|p| subpath(&p, &out_dir).unwrap())
                 .collect();
 
-            // create a dir that contains all files from `source` that have been modified
-            // during the incremental encryption
-            //
-            // `cp -r "$source" "$original_w_modified_files"`
-            let original_w_modified_files_tmpd = tmpdir!().unwrap();
-            let original_w_modified_files_tmpd = original_w_modified_files_tmpd
-                .path()
-                .join("316mqlHdMwUmCNXgGcm4t9uVzeL9AxzU");
-            cp_r(&source, &original_w_modified_files_tmpd);
-            let original_w_modified_files = (&original_w_modified_files_tmpd).join(&source_basename);
-            assert!(original_w_modified_files.exists());
-            // collect only the created and modified files
-            let modified_files: HashSet<_> = rel_change_set
-                .iter()
-                .filter_map(|c| match c {
-                    Change::CreateDir(rel_path) | Change::Append(rel_path) => {
-                        // workaround the type system
-                        Some(
-                            original_w_modified_files
-                                .join(rel_path)
-                                .ancestors()
-                                .map(Path::to_path_buf)
-                                .collect::<Vec<_>>(),
-                        )
-                    }
-                    _ => None,
-                })
-                .flat_map(|vec| vec.into_iter())
-                .collect();
+            let (original_w_modified_files, modified_files) = cp_r_with_mod_created(&source, &rel_change_set);
+            let original_w_modified_files = original_w_modified_files.path();
 
             if modified_files.len() == 0 {
                 return;
