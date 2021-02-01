@@ -1,15 +1,14 @@
-use crate::{prelude::*, test_util::*, tests_e2e::success::util::*, util::*};
-use itertools::Itertools;
-use maplit::*;
-use std::{
+pub use crate::{prelude::*, test_util::*, tests_e2e::success::util::*, util::*};
+pub use itertools::Itertools;
+pub use std::{
     collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
 };
-use walkdir::WalkDir;
+pub use walkdir::WalkDir;
 
 #[derive(PartialEq, Eq, Hash, Debug)]
-enum Change {
+pub enum Change {
     // create a dir
     CreateDir(PathBuf),
     // add some random data to this file
@@ -65,7 +64,7 @@ impl Change {
 // TODO https://doc.rust-lang.org/std/macro.is_x86_feature_detected.html
 
 //
-fn create_files<P>(root: P, rel_paths: &Vec<&str>)
+pub fn create_files<P>(root: P, rel_paths: &Vec<&str>)
 where
     P: AsRef<Path>,
 {
@@ -81,7 +80,7 @@ where
         });
 }
 
-fn subpaths<P1, P2>(paths: &HashSet<P2>, root: P1) -> HashSet<PathBuf>
+pub fn subpaths<P1, P2>(paths: &HashSet<P2>, root: P1) -> HashSet<PathBuf>
 where
     P1: AsRef<Path>,
     P2: AsRef<Path>,
@@ -89,7 +88,7 @@ where
     paths.iter().map(|p| subpath(p, &root).unwrap()).collect()
 }
 
-fn pop_front<P>(path: P) -> PathBuf
+pub fn pop_front<P>(path: P) -> PathBuf
 where
     P: AsRef<Path>,
 {
@@ -100,7 +99,7 @@ where
     .unwrap()
 }
 
-fn cp_r_src_with_mod_created<P>(source: P, rel_change_set: &HashSet<Change>) -> (tempfile::TempDir, HashSet<PathBuf>)
+pub fn cp_r_src_with_mod_created<P>(source: P, rel_change_set: &HashSet<Change>) -> (tempfile::TempDir, HashSet<PathBuf>)
 where
     P: AsRef<Path>,
 {
@@ -160,7 +159,7 @@ where
     (tmpd, modified_files)
 }
 
-fn cp_r_outdir_with_mod_created<P>(outdir: P, changed: &HashSet<PathBuf>) -> (tempfile::TempDir, PathBuf)
+pub fn cp_r_outdir_with_mod_created<P>(outdir: P, changed: &HashSet<PathBuf>) -> (tempfile::TempDir, PathBuf)
 where
     P: AsRef<Path>,
 {
@@ -195,7 +194,7 @@ where
     (out_dir_w_modified_files_tmpd, out_dir_w_modified_files)
 }
 
-fn check_deletions<P1, P2>(
+pub fn check_deletions<P1, P2>(
     dec_dir_1: P1,
     dec_dir_2: P2,
     dec_dir_1_snapshot: &Snapshot,
@@ -232,27 +231,31 @@ fn check_deletions<P1, P2>(
 // 1. verify deleted files
 macro_rules! generate_incremental_build_success_test_func {
     ( $fn_name:ident, $root_tmpdir:expr, $files_to_create:expr, $rel_change_set:expr, $key:literal ) => {
+        //
         #[test]
         fn $fn_name() {
+            //
             let _root_tmpdir = $root_tmpdir;
+            //
             let files_to_create = $files_to_create;
-
-            // same keys, so it shouldn't fail from mismatch
+            //
             let key_1 = $key;
             let key_2 = key_1;
-
             //
             let exit_code = 0;
-
             //
             let source = tmpdir!().unwrap();
             let source = source.path();
-            create_files(&source, &files_to_create);
-
             //
             let out_dir = tmpdir!().unwrap();
             let out_dir = out_dir.path();
+            //
+            let rel_change_set = $rel_change_set;
 
+            // set up `source` as specified in `$files_to_create`
+            create_files(&source, &files_to_create);
+
+            // syntactic sugar
             macro_rules! encrypt {
                 ( $source_predicate:block ) => {
                     check_encrypt!(
@@ -267,6 +270,7 @@ macro_rules! generate_incremental_build_success_test_func {
                     )
                 };
             }
+            // syntactic sugar
             macro_rules! decrypt {
                 ( $original:expr, $out_dir:expr, $dec_dir:expr ) => {
                     check_decrypt!(
@@ -291,29 +295,32 @@ macro_rules! generate_incremental_build_success_test_func {
 
             decrypt!(source, out_dir, dec_dir_1);
 
-            let out_dir_snapshot_before_initial_enc = snapshot(&out_dir);
             let dec_dir_1_snapshot = snapshot(&dec_dir_1);
-            let out_dir_snapshot_after_initial_enc = snapshot(&out_dir);
 
-            // change set with relative paths
-            let rel_change_set = $rel_change_set;
             // change set with absolute paths
             let change_set: HashSet<_> = rel_change_set
                 .iter()
                 .map(|c: &Change| -> Change { c.prepend(&source) })
                 .collect();
 
-            let source_snapshot_before_changes = snapshot(&source);
-            // actually perform the changes
-            change_set.iter().for_each(Change::manifest);
-            let source_snapshot_after_changes = snapshot(&source);
+            // 
+            let modified_and_created_in_source: HashSet<_> = {
+                //
+                let source_snapshot_before_changes = snapshot(&source);
+                change_set.iter().for_each(Change::manifest);
+                let source_snapshot_after_changes = snapshot(&source);
+                //
+                let source_changes = source_snapshot_after_changes.since(&source_snapshot_before_changes);
+                //
+                source_changes.added.union(&source_changes.modified).cloned().collect()
+            };
 
-            let source_changes = source_snapshot_after_changes.since(&source_snapshot_before_changes);
-            let source_changes_mod_created: HashSet<_> =
-                source_changes.added.union(&source_changes.modified).cloned().collect();
-
+            // TODO the outdir snapshot before/after moved around and caused no failures
+            // TODO make sure this is used and checkd properly
+            let out_dir_snapshot_before_initial_enc = snapshot(&out_dir);
             // incremental encryption from `source` -> `out_dir`
-            encrypt!({ |path| { source_changes_mod_created.contains(path) } });
+            encrypt!({ |path| { modified_and_created_in_source.contains(path) } });
+            let out_dir_snapshot_after_initial_enc = snapshot(&out_dir);
 
             // decrypt the incrementally encrypted result to a different directory
             // to check that deleted files are correctly reflected
@@ -376,167 +383,3 @@ macro_rules! delete {
         Change::Delete(PathBuf::from($path))
     };
 }
-
-// TODO use hash based modification detection
-
-mod deletions {
-    use super::*;
-
-    // ./
-    // ├── d0/
-    // │  ├── d1/
-    // │  │  ├── d2/
-    // │  │  └── f1
-    // │  ├── d4/
-    // │  │  ├── f3
-    // │  │  └── f4
-    // │  ├── d5/
-    // │  │  ├── d6/
-    // │  │  └── d7/
-    // │  └── f2
-    // ├── d3/
-    // └── f0
-    //
-    // ./d0/
-    // ./d0/d1/
-    // ./d0/d1/d2/
-    // ./d0/d1/f1
-    // ./d0/d4/
-    // ./d0/d4/f3
-    // ./d0/d4/f4
-    // ./d0/d5/"
-    // ./d0/d5/d6
-    // ./d0/d5/d7
-    // ./d0/d5/d8
-    // ./d0/f2
-    // ./d3/
-    // ./f0
-    macro_rules! paths {
-        () => {
-            vec![
-                "d0/",
-                "d0/d1/",
-                "d0/d1/d2/",
-                "d0/d1/f1",
-                "d0/d4/",
-                "d0/d4/f3",
-                "d0/d4/f4",
-                "d0/d5/",
-                "d0/d5/d6/",
-                "d0/d5/d7/",
-                "d0/d5/d8/",
-                "d0/f2",
-                "d3/",
-                "f0",
-            ]
-        };
-    }
-
-    //
-    generate_incremental_build_success_test_func!(
-        delete_nothing,
-        tmpdir!().unwrap(),
-        paths!(),
-        hashset! {},
-        "dcq100mDxK2f1slccaE5u6r49GrH5X3KjTgBXQJGEhaKJZk8EWqNVVTw5t9g7qqL"
-    );
-    //
-    generate_incremental_build_success_test_func!(
-        delete_toplevel_file,
-        tmpdir!().unwrap(),
-        paths!(),
-        hashset! {delete!("f0")},
-        "80G3L0ybIYpzgdHbFS3YXGCvCi1e8Tc0stuQ26T8T7mKvttF0wxvoMcYNRiFSpKJ"
-    );
-    //
-    generate_incremental_build_success_test_func!(
-        delete_toplevel_empty_dir,
-        tmpdir!().unwrap(),
-        paths!(),
-        hashset! {delete!("d3/")},
-        "aQYr0DxQbYsGxA5eQPlbdwd78lXYn8uyixSd7ci59KBMRFAjAi3HCtt0z1KvYT1u"
-    );
-    //
-    generate_incremental_build_success_test_func!(
-        nested_empty_dir,
-        tmpdir!().unwrap(),
-        paths!(),
-        hashset! {delete!("d0/d1/d2/")},
-        "B9WlmZZbRThjGwUyypFz33jUcvxRKdH827X3PKzdFxODpaaTFvFRh3HvgW418fTU"
-    );
-    //
-    generate_incremental_build_success_test_func!(
-        nested_file,
-        tmpdir!().unwrap(),
-        paths!(),
-        hashset! {delete!("d0/d1/f1")},
-        "Jgc99KQ2CifNNeFpTxzMfiAxMNw6aHNvNYq7hGRfMW4wU3fuPPa4XUF1NdU3LQ5s"
-    );
-    //
-    generate_incremental_build_success_test_func!(
-        nested_dir_of_files,
-        tmpdir!().unwrap(),
-        paths!(),
-        hashset! {delete!("d0/d4/"), delete!("d0/d4/f3"), delete!("d0/d4/f4")},
-        "FpNquL7nH1ycnsWeMvvyUUH1gwRmdUzp5KIYWc45z9mDmlHrgir2LYir18BoNesI"
-    );
-    //
-    generate_incremental_build_success_test_func!(
-        nested_dir_of_empty_dirs,
-        tmpdir!().unwrap(),
-        paths!(),
-        hashset! {
-            delete!("d0/d5/"),
-            delete!("d0/d5/d6/"),
-            delete!("d0/d5/d7/"),
-            delete!("d0/d5/d8/")
-        },
-        "FpNquL7nH1ycnsWeMvvyUUH1gwRmdUzp5KIYWc45z9mDmlHrgir2LYir18BoNesI"
-    );
-    //
-    generate_incremental_build_success_test_func!(
-        nested_dir_of_all,
-        tmpdir!().unwrap(),
-        paths!(),
-        hashset! {
-            delete!("d0/"),
-            delete!("d0/d1/"),
-            delete!("d0/d1/d2/"),
-            delete!("d0/d1/f1"),
-            delete!("d0/d4/"),
-            delete!("d0/d4/f3"),
-            delete!("d0/d4/f4"),
-            delete!("d0/d5/"),
-            delete!("d0/d5/d6/"),
-            delete!("d0/d5/d7/"),
-            delete!("d0/d5/d8/"),
-            delete!("d0/f2")
-        },
-        "b1VV1nNCmwPKS2cIu8CFEHgg8HsSa1AOtfhjfzCNr2gEfmPaSrmOc33N1slcb5Im"
-    );
-}
-
-/*
-"FLyPjJfFfRqjZsiEudkbJDcxtWntvVPtcgyYzF9Gz7OcvKWSU34XQEePvwyJXuKX"
-"xOsHKomPrPsdIuf7lynKZaZKQrv60vHQ9WkYDvPWSgfJrDEm7T2A4izPvHSwwdOH"
-"wHxZS6khMOgo80J3JfepWPIG1ENuvQsfoMezDCQhBvVHy1MicBG16cnpBMJZn9sS"
-"wLT9WcAmEg4ma3hOpz72Fj0TkIi1h2jQGWBOg7zdxuIz6nRhd1uwGpCpljoCECtO"
-"QN6nXe7B3KkQUHZZAKEvnncGfbYcoYZR1jXlEzO3CN4GXEJSTmYRzy1eFM6kJHZ4"
-"xzcI2Y9tG2NBQj7E7vlZzmADW4B4XSlyR2fIID0ySZRBD5nNZoiLAbd5ryFiiiGK"
-"WmgqBkDGyRqZ9gYFYrs3QQ3fPCyY6R7uX10Lz5hx40trINllm3BqtbaqamH8asvk"
-"jwFxuYFpBPK0aaX8uwuGJ26ypgaKMne8BceRgLCUeHnuSkKm49bkeJJbqJ84yaN9"
-"cfeCqNwQrFkXoB22vrSGLQbIMmX1Qwwj0pCQNEKgAPyCVr7kI7xjWHvsOxqC897y"
-"kkYntCY2VyCXSCX4un3jTQpRJA93LahKGf4kQSnYkYmKMbokYgVfqJ8xMzbJhx78"
-"KrTlIqkiEjqGMbKOylmnPA9IUnsD5GeWz9XBVBShY6q2cabclhDYzSoiApeLP64B"
-*/
-
-/*
-#[test]
-fn created_files_are_detected() {
-    todo!();
-}
-#[test]
-fn changed_files_are_detected() {
-    todo!();
-}
-*/
