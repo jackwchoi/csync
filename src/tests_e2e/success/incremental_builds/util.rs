@@ -303,7 +303,7 @@ macro_rules! generate_incremental_build_success_test_func {
                 .map(|c: &Change| -> Change { c.prepend(&source) })
                 .collect();
 
-            // 
+            //
             let modified_and_created_in_source: HashSet<_> = {
                 //
                 let source_snapshot_before_changes = snapshot(&source);

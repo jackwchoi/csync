@@ -118,6 +118,10 @@ fn reporting_thread(start: Instant, receiver: Receiver<Option<(usize, usize)>>) 
         let mut file_count = 0;
         let mut bytes_read = 0;
         let mut bytes_writ = 0;
+
+        let interval = Duration::from_secs(1);
+        let mut last = Instant::now();
+
         //
         loop {
             // TODO change from unwrap to ignoring behavior
@@ -126,31 +130,36 @@ fn reporting_thread(start: Instant, receiver: Receiver<Option<(usize, usize)>>) 
             // the ncontinue with the updating line
             match receiver.recv().unwrap() {
                 Some((src_bytes, dst_bytes)) => {
-                    let elapsed = end_timer(&start);
-
                     file_count += 1;
                     bytes_read += src_bytes;
                     bytes_writ += dst_bytes;
-
-                    let format_v = |value: f64, unit| {
-                        let (adj_value, adj_unit) = adjust_value(value, unit);
-                        color!(Green, "{:>7} {}", adj_value, adj_unit)
-                    };
-
-                    // TODO format time, report compression ratios
-                    eprint!(
-                        "\r{} | {} -> {} in {:>7} = {}...",
-                        format_v(file_count as f64, "files"),
-                        format_v(bytes_read as f64, "B"),
-                        format_v(bytes_writ as f64, "B"),
-                        color!(Green, "{:.3?}", elapsed),
-                        format_v(bytes_read as f64 / (elapsed.as_nanos() as f64) * 1e9, "B/s")
-                    );
+                    //
+                    let now = Instant::now();
+                    if interval < now.duration_since(last) {
+                        report_line(file_count, bytes_read, bytes_writ, &start);
+                        last = now;
+                    }
                 }
                 None => break,
             }
         }
     })
+}
+// TODO format time, report compression ratios
+fn report_line(file_count: usize, bytes_read: usize, bytes_writ: usize, start: &Instant) {
+    let elapsed = end_timer(&start);
+    let format_v = |value: f64, unit| {
+        let (adj_value, adj_unit) = adjust_value(value, unit);
+        color!(Green, "{:>7} {}", adj_value, adj_unit)
+    };
+    eprint!(
+        "\r{} | {} -> {} in {:>7} = {}...",
+        format_v(file_count as f64, "files"),
+        format_v(bytes_read as f64, "B"),
+        format_v(bytes_writ as f64, "B"),
+        color!(Green, "{:.3?}", elapsed),
+        format_v(bytes_read as f64 / (elapsed.as_nanos() as f64) * 1e9, "B/s")
+    );
 }
 
 impl fmt::Display for SyncStats {
